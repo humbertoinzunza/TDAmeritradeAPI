@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.1.32210.238
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TDAmeritradeAPI", "TDAmeritradeAPI\TDAmeritradeAPI.csproj", "{974AFFC9-3AF9-47DE-8768-B28205D25381}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{974AFFC9-3AF9-47DE-8768-B28205D25381}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{974AFFC9-3AF9-47DE-8768-B28205D25381}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{974AFFC9-3AF9-47DE-8768-B28205D25381}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{974AFFC9-3AF9-47DE-8768-B28205D25381}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {AA61112A-B366-4FDA-BD5B-BA7ED496B620}
+	EndGlobalSection
+EndGlobal

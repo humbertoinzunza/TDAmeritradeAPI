@@ -8,6 +8,9 @@ namespace TDAmeritradeAPI
     {
         public class Enums
         {
+            // This enum is only for the OrderGenerator class to know if the symbol in question is from an equity, an option, or something else
+            public enum SecurityType { Equity, Option, Other }
+
             [JsonConverter(typeof(StringEnumConverter))]
             public enum Session { NORMAL, AM, PM, SEAMLESS }
 
@@ -157,6 +160,12 @@ namespace TDAmeritradeAPI
         [JsonConverter(typeof(StringEnumConverter))]
         public enum AssetTypes { EQUITY, OPTION, INDEX, MUTUAL_FUND, CASH_EQUIVALENT, FIXED_INCOME, CURRENCY }
         // Properties
+        public Instrument() { }
+        public Instrument(string? symbol, AssetTypes? assetType)
+        {
+            Symbol = symbol;
+            AssetType = assetType;
+        }
         public AssetTypes? AssetType { get; set; }
         public string? Cusip { get; set; }
         public string? Symbol { get; set; }

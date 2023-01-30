@@ -115,13 +115,15 @@ namespace TDAmeritradeAPI
             chromedriver.Quit();
 
             // Create the parameters for the HTTP request
-            Dictionary<string, string> parameters = new();
-            parameters["grant_type"] = "authorization_code";
-            parameters["refresh_token"] = "";
-            parameters["access_type"] = "offline";
-            parameters["code"] = authorizationCode;
-            parameters["client_id"] = _oAuth2Data.ClientID;
-            parameters["redirect_uri"] = _oAuth2Data.RedirectURI;
+            Dictionary<string, string> parameters = new()
+            {
+                ["grant_type"] = "authorization_code",
+                ["refresh_token"] = "",
+                ["access_type"] = "offline",
+                ["code"] = authorizationCode,
+                ["client_id"] = _oAuth2Data.ClientID,
+                ["redirect_uri"] = _oAuth2Data.RedirectURI
+            };
 
             // Use the HTTP POST method to get a refresh token
             await PostAccessToken(parameters);
@@ -189,13 +191,15 @@ namespace TDAmeritradeAPI
         private async Task GetNewToken(Token token)
         {
             // Create the parameters for the HTTP request
-            Dictionary<string, string> parameters = new();
-            parameters["grant_type"] = "refresh_token";
-            parameters["refresh_token"] = _oAuth2Data.RefreshToken!;
-            parameters["access_type"] = "offline";
-            parameters["code"] = "";
-            parameters["client_id"] = _oAuth2Data.ClientID!;
-            parameters["redirect_uri"] = "";
+            Dictionary<string, string> parameters = new()
+            {
+                ["grant_type"] = "refresh_token",
+                ["refresh_token"] = _oAuth2Data.RefreshToken!,
+                ["access_type"] = "offline",
+                ["code"] = "",
+                ["client_id"] = _oAuth2Data.ClientID!,
+                ["redirect_uri"] = ""
+            };
 
             // Parameters for both tokens are the same, except the 'access_type' parameter
             // which must be left empty for a new access_token
@@ -398,9 +402,8 @@ namespace TDAmeritradeAPI
                     await FirstTimeTokens().ConfigureAwait(false);
                     break;
             }
-
-            if(_refreshTokenTimer != null)
-                _refreshTokenTimer.Dispose();
+            
+            _refreshTokenTimer?.Dispose();
 
             if (code == 0 || code == 2)
             {
@@ -489,13 +492,15 @@ namespace TDAmeritradeAPI
         /// So far it only parses stock options, but perhaps there is a way to parse futures and futures' options
         /// so the get_quote() function is not so useless.
         /// </remarks>
-        private static void ParseSymbol(ref string symbol)
+        internal static Order.Enums.SecurityType ParseSymbol(ref string symbol)
         {
+            Order.Enums.SecurityType type = Order.Enums.SecurityType.Other;
+
             symbol = symbol.ToUpper().Trim();
 
-            if(symbol.Length >= 2)
+            if (symbol.Length >= 2)
             {
-                if(symbol[0] == '.')
+                if (symbol[0] == '.')
                 {
                     // Remove the first character '.'
                     symbol = symbol[1..];
@@ -516,9 +521,22 @@ namespace TDAmeritradeAPI
                         // Join the head, correctly formatted date, and tail and put an underscore in between them
                         // to get the required stock option symbol for the API.
                         symbol = head + '_' + date + tail;
+
+                        type = Order.Enums.SecurityType.Option;
                     }
                 }
+                // For already parsed option symbols
+                else if (symbol.Contains('_'))
+                    type = Order.Enums.SecurityType.Option;
+                else if (char.IsLetter(symbol[0]))
+                    type = Order.Enums.SecurityType.Equity;
             }
+            else if (symbol.Length == 0)
+                type = Order.Enums.SecurityType.Other;
+            else if (char.IsLetter(symbol[0]))
+                type = Order.Enums.SecurityType.Equity;
+
+            return type;
         }
 
         /// <summary>

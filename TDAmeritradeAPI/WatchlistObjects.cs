@@ -20,7 +20,6 @@ namespace TDAmeritradeAPI
         /// <param name="itemList">List watchlist items.</param>
         public Watchlist(string name, List<WatchlistItem> itemList) : this()
         {
-
             Name = name;
             WatchlistItems = itemList;
         }

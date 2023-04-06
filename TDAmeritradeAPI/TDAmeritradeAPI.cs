@@ -154,7 +154,7 @@ namespace TDAmeritradeAPI
 
             // Get version number
             string versionNumber = await _httpClient.GetStringAsync("https://chromedriver.storage.googleapis.com/LATEST_RELEASE").ConfigureAwait(false);
-            
+
             // Build download URL
             string downloadURL = "https://chromedriver.storage.googleapis.com/" + versionNumber + chromedrDriverType;
 
@@ -245,7 +245,7 @@ namespace TDAmeritradeAPI
                 request.Content = new FormUrlEncodedContent(parameters);
 
             // Set the authorization header
-            if(authenticatedRequest)
+            if (authenticatedRequest)
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _oAuth2Data.AccessToken);
 
             // Send the request
@@ -314,12 +314,12 @@ namespace TDAmeritradeAPI
         private async void RefreshTokenTimerElapsed(object? source, ElapsedEventArgs e)
         {
             await GetNewToken(Token.AccessToken).ConfigureAwait(false);
-            if(_firstTimer)
+            if (_firstTimer)
             {
                 Debug.WriteLine($"Second run of timer. Initialized to 1680 seconds.");
                 _firstTimer = false;
                 _refreshTokenTimer!.Interval = 1680000;
-            }    
+            }
         }
 
         /// <summary>
@@ -352,7 +352,7 @@ namespace TDAmeritradeAPI
                     _oAuth2Data.WriteTokenExpiration(OAuth2Data.TokenType.RefreshToken);
                 }
                 // Only access token created
-                else if(parameters["access_type"] == "")
+                else if (parameters["access_type"] == "")
                 {
                     Debug.WriteLine("New access token obtained.");
                     _oAuth2Data.AccessToken = jsonResponse["access_token"];
@@ -360,7 +360,7 @@ namespace TDAmeritradeAPI
                     // Change the default authorization header
                 }
             }
-            else if(parameters["grant_type"] == "authorization_code" && parameters["access_type"] == "offline")
+            else if (parameters["grant_type"] == "authorization_code" && parameters["access_type"] == "offline")
             {
                 Debug.WriteLine("New set of tokens obtained.");
                 _oAuth2Data.AccessToken = jsonResponse["access_token"];
@@ -402,7 +402,7 @@ namespace TDAmeritradeAPI
                     await FirstTimeTokens().ConfigureAwait(false);
                     break;
             }
-            
+
             _refreshTokenTimer?.Dispose();
 
             if (code == 0 || code == 2)
@@ -437,7 +437,7 @@ namespace TDAmeritradeAPI
 
             foreach (KeyValuePair<string, string> parameter in parameters)
                 url += parameter.Key + "=" + HttpUtility.UrlEncode(parameter.Value) + '&';
-            
+
             // Remove the last & symbol
             url = url[..^1];
 
@@ -548,9 +548,9 @@ namespace TDAmeritradeAPI
         {
             // Create an array of the symbols
             string[] symbolsArray = symbols.Split(',');
-            
+
             // Parse each individual symbol
-            for(int i = 0; i < symbolsArray.Length; i++)
+            for (int i = 0; i < symbolsArray.Length; i++)
                 ParseSymbol(ref symbolsArray[i]);
 
             // Return the list of comma-separated symbols
@@ -638,7 +638,7 @@ namespace TDAmeritradeAPI
         /// <returns>Returns all watchlists from all the linked accounts.</returns>
         public async Task<string> GetWatchlistForMultipleAccounts()
         {
-           string endpoint = $"https://api.tdameritrade.com/v1/accounts/watchlists";
+            string endpoint = $"https://api.tdameritrade.com/v1/accounts/watchlists";
 
             return await HttpRequest(endpoint, HttpMethod.Get).ConfigureAwait(false);
         }
@@ -707,7 +707,7 @@ namespace TDAmeritradeAPI
         public async Task<string> GetAccount(string accountId, bool getPositions = false, bool getOrders = false)
         {
             // Small trick so this method is easily reused in GetAccounts() method
-            if(accountId != "")
+            if (accountId != "")
                 accountId = '/' + accountId;
 
             Dictionary<string, string>? parameters = null;
@@ -715,7 +715,7 @@ namespace TDAmeritradeAPI
             // Create a dictionary with the parameters
             if (getPositions)
                 parameters = new Dictionary<string, string>() { { "fields", "positions" } };
-            if(getOrders)
+            if (getOrders)
             {
                 if (parameters == null)
                     parameters = new Dictionary<string, string>() { { "fields", "orders" } };
@@ -934,7 +934,7 @@ namespace TDAmeritradeAPI
             string endpoint;
 
             Dictionary<string, string> parameters = new();
-            if(isByPath)
+            if (isByPath)
             {
                 if (accountId == null)
                     throw new Exception("Error. The GetOrdersByPath() function requires an account ID.");
@@ -958,7 +958,7 @@ namespace TDAmeritradeAPI
                 DateTime notNullableDate = (DateTime)endDate;
                 parameters["toEnteredTime"] = notNullableDate.ToString("yyyy-MM-dd");
             }
-            if(status != null)
+            if (status != null)
                 parameters["status"] = status.ToString()!;
 
             return await HttpRequest(endpoint, HttpMethod.Get, parameters).ConfigureAwait(false);
@@ -1031,7 +1031,7 @@ namespace TDAmeritradeAPI
         /// </remarks>
         private async Task PlaceOrderHelper(string accountId, string? orderId, Order order)
         {
-            if(orderId != null)
+            if (orderId != null)
             {
                 // Validate status. Pretty empty right now since there is no documentation on
                 // which order status prevent from replacing an order.
@@ -1060,7 +1060,7 @@ namespace TDAmeritradeAPI
                 {
                     orderLeg.LegId = null;
                     orderLeg.PositionEffect = null;
-                    if(orderLeg.Instrument != null)
+                    if (orderLeg.Instrument != null)
                         orderLeg.Instrument!.Cusip = null;
                 }
             }

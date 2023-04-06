@@ -59,10 +59,10 @@ namespace TDAmeritradeAPI
         {
             Instrument = new Enums.Instrument(symbol, assetType);
         }
-            
+
         public static int Quantity { get { return 0; } set { Quantity = value; } }
         public static int AveragePrice { get { return 0; } set { AveragePrice = value; } }
-        public static int Commission { get { return 0; } set { Commission = value; }  }
+        public static int Commission { get { return 0; } set { Commission = value; } }
         public Enums.Instrument? Instrument { get; set; }
         public int? SequenceId { get; set; }
     }

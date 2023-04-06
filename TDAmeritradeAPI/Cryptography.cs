@@ -87,13 +87,13 @@ namespace TDAmeritradeAPI
                     return decryptReader.ReadToEnd();
                 }
             }
-            catch(FileNotFoundException)
+            catch (FileNotFoundException)
             {
                 Console.WriteLine("The decryption failed. File not found.");
                 // Return empty array due to unsuccessfull decryption process
                 return null;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Console.WriteLine($"The decryption failed. {ex}");
                 // Return empty array due to unsuccessfull decryption process

@@ -1,6 +1,6 @@
-﻿using Newtonsoft.Json;
+﻿using JsonSubTypes;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
-using JsonSubTypes;
 
 namespace TDAmeritradeAPI
 {
@@ -18,14 +18,20 @@ namespace TDAmeritradeAPI
             public enum Duration { DAY, GOOD_TILL_CANCEL, FILL_OR_KILL }
 
             [JsonConverter(typeof(StringEnumConverter))]
-            public enum OrderType { MARKET, LIMIT, STOP, STOP_LIMIT, TRAILING_STOP, MARKET_ON_CLOSE,
-                EXERCISE, TRAILING_STOP_LIMIT, NET_DEBIT, NET_CREDIT, NET_ZERO }
+            public enum OrderType
+            {
+                MARKET, LIMIT, STOP, STOP_LIMIT, TRAILING_STOP, MARKET_ON_CLOSE,
+                EXERCISE, TRAILING_STOP_LIMIT, NET_DEBIT, NET_CREDIT, NET_ZERO
+            }
 
             [JsonConverter(typeof(StringEnumConverter))]
-            public enum ComplexOrderStrategyType { NONE, COVERED, VERTICAL, BACK_RATIO, CALENDAR, DIAGONAL,
+            public enum ComplexOrderStrategyType
+            {
+                NONE, COVERED, VERTICAL, BACK_RATIO, CALENDAR, DIAGONAL,
                 STRADDLE, STRANGLE, COLLAR_SYNTHETIC, BUTTERFLY, CONDOR, IRON_CONDOR, VERTICAL_ROLL,
                 COLLAR_WITH_STOCK, DOUBLE_DIAGONAL, UNBALANCED_BUTTERFLY, UNBALANCED_CONDOR, UNBALANCED_IRON_CONDOR,
-                UNBALANCED_VERTICAL_ROLL, CUSTOM }
+                UNBALANCED_VERTICAL_ROLL, CUSTOM
+            }
 
             [JsonConverter(typeof(StringEnumConverter))]
             public enum RequestedDestination { INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO }
@@ -46,8 +52,11 @@ namespace TDAmeritradeAPI
             public enum OrderLegType { EQUITY, OPTION, INDEX, MUTUAL_FUND, CASH_EQUIVALENT, FIXED_INCOME, CURRENCY }
 
             [JsonConverter(typeof(StringEnumConverter))]
-            public enum Instruction { BUY, SELL, BUY_TO_COVER, SELL_SHORT, BUY_TO_OPEN, BUY_TO_CLOSE, SELL_TO_OPEN,
-                SELL_TO_CLOSE, EXCHANGE }
+            public enum Instruction
+            {
+                BUY, SELL, BUY_TO_COVER, SELL_SHORT, BUY_TO_OPEN, BUY_TO_CLOSE, SELL_TO_OPEN,
+                SELL_TO_CLOSE, EXCHANGE
+            }
 
             [JsonConverter(typeof(StringEnumConverter))]
             public enum PositionEffect { OPENING, CLOSING, AUTOMATIC }
@@ -56,20 +65,42 @@ namespace TDAmeritradeAPI
             public enum QuantityType { ALL_SHARES, DOLLARS, SHARES }
 
             [JsonConverter(typeof(StringEnumConverter))]
-            public enum SpecialInstruction { ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE}
+            public enum SpecialInstruction { ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE }
 
             [JsonConverter(typeof(StringEnumConverter))]
             public enum OrderStrategyType { SINGLE, OCO, TRIGGER }
 
             [JsonConverter(typeof(StringEnumConverter))]
-            public enum Status { AWAITING_PARENT_ORDER, AWAITING_CONDITION, AWAITING_MANUAL_REVIEW, ACCEPTED,
+            public enum Status
+            {
+                AWAITING_PARENT_ORDER, AWAITING_CONDITION, AWAITING_MANUAL_REVIEW, ACCEPTED,
                 AWAITING_UR_OUT, PENDING_ACTIVATION, QUEUED, WORKING, REJECTED, PENDING_CANCEL, CANCELED,
-                PENDING_REPLACE, REPLACED, FILLED, EXPIRED }
+                PENDING_REPLACE, REPLACED, FILLED, EXPIRED
+            }
         }
 
         // Structs
         public class OrderLeg
         {
+            public OrderLeg() { }
+            public OrderLeg(Enums.Instruction instruction, double quantity, Instrument instrument)
+            {
+                Instruction = instruction;
+                Quantity = quantity;
+                Instrument = instrument;
+            }
+            public OrderLeg(Enums.OrderLegType? orderLegType, long? legId, Instrument? instrument, Enums.Instruction? instruction,
+                Enums.PositionEffect? positionEffect, double? quantity, Enums.QuantityType? quantityType)
+            {
+                OrderLegType = orderLegType;
+                LegId = legId;
+                Instrument = instrument;
+                Instruction = instruction;
+                PositionEffect = positionEffect;
+                Quantity = quantity;
+                QuantityType = quantityType;
+            }
+
             public Enums.OrderLegType? OrderLegType { get; set; }
             public long? LegId { get; set; }
             public Instrument? Instrument { get; set; }
@@ -85,7 +116,7 @@ namespace TDAmeritradeAPI
         public Enums.OrderType? OrderType { get; set; }
         public string? CancelTime { get; set; }
         public Enums.ComplexOrderStrategyType? ComplexOrderStrategyType { get; set; }
-        public double? Quantity{ get; set; }
+        public double? Quantity { get; set; }
         public double? FilledQuantity { get; set; }
         public double? RemainingQuantity { get; set; }
         public Enums.RequestedDestination? RequestedDestination { get; set; }

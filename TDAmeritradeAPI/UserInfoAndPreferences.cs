@@ -71,11 +71,11 @@ namespace TDAmeritradeAPI
         public bool? DirectEquityRouting { get; set; }
         public Enums.EquityOrderLegInstruction DefaultEquityOrderLegInstruction { get; set; }
         public Enums.EquityOrderType DefaultEquityOrderType { get; set; }
-        public Enums.EquityOrderPriceLinkType DefaultEquityOrderPriceLinkType{ get; set; }
+        public Enums.EquityOrderPriceLinkType DefaultEquityOrderPriceLinkType { get; set; }
         public Enums.EquityOrderDuration DefaultEquityOrderDuration { get; set; }
         public Enums.EquityOrderMarketSession DefaultEquityOrderMarketSession { get; set; }
         public int DefaultEquityQuantity { get; set; }
-        public Enums.TaxLotMethod MutualFundTaxLotMethod { get; set; } 
+        public Enums.TaxLotMethod MutualFundTaxLotMethod { get; set; }
         public Enums.TaxLotMethod OptionTaxLotMethod { get; set; }
         public Enums.TaxLotMethod EquityTaxLotMethod { get; set; }
         public Enums.AdvancedToolLaunch DefaultAdvancedToolLaunch { get; set; }

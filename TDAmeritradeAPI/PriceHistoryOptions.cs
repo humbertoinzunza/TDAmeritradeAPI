@@ -74,21 +74,21 @@
             // If this is true, then the user is not using these two parameters
             if (StartDate == -1 || EndDate == -1)
             {
-                result["periodType"]            = PeriodType.ToString().ToLower();
-                result["period"]                = Period.ToString();
-                result["frequencyType"]         = FrequencyType.ToString().ToLower();
-                result["frequency"]             = Frequency.ToString();
+                result["periodType"] = PeriodType.ToString().ToLower();
+                result["period"] = Period.ToString();
+                result["frequencyType"] = FrequencyType.ToString().ToLower();
+                result["frequency"] = Frequency.ToString();
                 result["needExtendedHoursData"] = NeedExtendedHoursData.ToString().ToLower();
             }
             // If this is true, then the user is not using this parameter and is instead using
             // StartDate and EndDate.
             else if (Period == -1)
             {
-                result["periodType"]            = PeriodType.ToString().ToLower();
-                result["frequencyType"]         = FrequencyType.ToString().ToLower();
-                result["frequency"]             = Frequency.ToString();
-                result["endDate"]               = EndDate.ToString();
-                result["startDate"]             = StartDate.ToString();
+                result["periodType"] = PeriodType.ToString().ToLower();
+                result["frequencyType"] = FrequencyType.ToString().ToLower();
+                result["frequency"] = Frequency.ToString();
+                result["endDate"] = EndDate.ToString();
+                result["startDate"] = StartDate.ToString();
                 result["needExtendedHoursData"] = NeedExtendedHoursData.ToString().ToLower();
             }
             return result;
@@ -103,7 +103,7 @@
         /// or if one of the dates is less than zero.</exception>
         private static void ValidateDates(int startDate, int endDate)
         {
-            if(startDate < 0 || endDate < 0)
+            if (startDate < 0 || endDate < 0)
                 throw new Exception("Both the start and the end date must be greater than zero.");
             if (startDate >= endDate)
                 throw new Exception("The end date must be greater than the start date.");
@@ -122,17 +122,17 @@
                 $" '{frequency}' combination is invalid.";
             bool isInvalid = false;
             int[] validFrequencies;
-            if(frequencyType == FrequencyTypes.Minute)
+            if (frequencyType == FrequencyTypes.Minute)
             {
                 validFrequencies = new int[] { 1, 5, 10, 15, 30 };
                 if (!validFrequencies.Contains(frequency))
                     isInvalid = true;
             }
-            else if(frequencyType == FrequencyTypes.Daily || frequencyType == FrequencyTypes.Weekly ||
+            else if (frequencyType == FrequencyTypes.Daily || frequencyType == FrequencyTypes.Weekly ||
                 frequencyType == FrequencyTypes.Monthly)
-                if(frequency != 1)
+                if (frequency != 1)
                     isInvalid = true;
-            else
+                else
                     throw new Exception("The frequency type is not valid.");
             if (isInvalid) throw new Exception(errorMessage);
         }
@@ -168,7 +168,7 @@
             else
                 throw new Exception("The period type is not valid.");
 
-            if(isInvalid) throw new Exception(errorMessage);
+            if (isInvalid) throw new Exception(errorMessage);
 
         }
 
@@ -189,7 +189,7 @@
             {
                 case PeriodTypes.Day:
                     validPeriods = new int[] { 1, 2, 3, 4, 5, 10 };
-                    if(!validPeriods.Contains(period))
+                    if (!validPeriods.Contains(period))
                         isInvalid = true;
                     break;
                 case PeriodTypes.Month:

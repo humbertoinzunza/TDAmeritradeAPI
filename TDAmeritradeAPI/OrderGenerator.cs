@@ -240,15 +240,15 @@ namespace TDAmeritradeAPI
         /// <summary>
         /// Creates a basic spread Order.
         /// </summary>
-        /// <param name="longSymbol">The option that is long in the spread.</param>
-        /// <param name="shortSymbol">The option that is short in the spread.</param>
-        /// <param name="quantity1">Units of long symbol.</param>
-        /// <param name="quantity2">Units of short symbol.</param>
+        /// <param name="longOption">The option that is long in the spread.</param>
+        /// <param name="longQuantity">Units of long symbol.</param>
+        /// <param name="shortOption">The option that is short in the spread.</param>
+        /// <param name="shortQuantity">Units of short symbol.</param>
         /// <param name="positionEffect">Determines if it's opening or closing a position.</param>
         /// <param name="duration">The duration of the order.</param>
-        /// <param name="net">It indicates if the order is net debit, net credit, or net zero. Set to null for a market order.</param>
+        /// <param name="netEffect">It indicates if the order is net debit, net credit, or net zero. Set to null for a market order.</param>
         /// <returns>An order for a spread.</returns>
-        /// <remarks>The order is incomplete and must be personalized based on the type of spread desired.</remarks>
+        /// <remarks>The user must make sure to choose the right option for netEffect if they don't want a market order.</remarks>
         private static Order CreateSpread(Option longOption, uint longQuantity, Option shortOption, uint shortQuantity, PositionEffect positionEffect,
             SpreadType spreadType, Order.Enums.Duration duration = Order.Enums.Duration.DAY, NetEffect? netEffect = null, double? price = null)
         {
@@ -287,6 +287,8 @@ namespace TDAmeritradeAPI
                 OrderType = net ?? Order.Enums.OrderType.MARKET,
                 Price = price,
                 OrderStrategyType = Order.Enums.OrderStrategyType.SINGLE,
+                ComplexOrderStrategyType = spreadType == SpreadType.Custom ? Order.Enums.ComplexOrderStrategyType.CUSTOM
+                    : null,
                 Duration = duration,
                 Session = Order.Enums.Session.NORMAL,
                 OrderLegCollection = new List<Order.OrderLeg>()
@@ -340,23 +342,149 @@ namespace TDAmeritradeAPI
             return order;
         }
 
-        public static Order TradeVerticalSpread(Option longOption, uint longQuantity, Option shortOption, uint shortQuantity,
-            PositionEffect positionEffect, Order.Enums.Duration duration = Order.Enums.Duration.DAY, double? price = null, NetEffect? netEffect = null)
+        /// <summary>
+        /// It takes an existing order and adds an order that will be triggered when the
+        /// main order is executed.
+        /// </summary>
+        /// <param name="triggerOrder">The main order that becomes the trigger.</param>
+        /// <param name="triggeredOrder">The order that is triggered after the main order is executed.</param>
+        public static Order TriggeredOrder(Order triggerOrder, Order triggeredOrder)
         {
-            if (price != null && netEffect == null)
-                throw new ArgumentException("Error. If price is not null, then net effect cannot be also null.");
+            Order newOrder = (Order)triggerOrder.Clone();
 
-            Order.Enums.OrderType? net;
-            if (netEffect == null)
-                net = null;
-            else if (netEffect == NetEffect.NetDebit)
-                net = Order.Enums.OrderType.NET_DEBIT;
-            else if (netEffect == NetEffect.NetCredit)
-                net = Order.Enums.OrderType.NET_CREDIT;
-            else
-                net = Order.Enums.OrderType.NET_ZERO;
+            // Change the main order to TRIGGER
+            newOrder.OrderStrategyType = Order.Enums.OrderStrategyType.TRIGGER;
 
-            return CreateSpread(longOption, longQuantity, shortOption, shortQuantity, positionEffect, SpreadType.Vertical, duration, net, price);
+            // Get the necessary data from the triggered order and add it to the ChilOrderStrategies list
+            // of the trigger order.
+            newOrder.ChildOrderStrategies = new List<object>()
+            {
+                Order.GetChildOrderStrategy(triggeredOrder)
+            };
+
+            return newOrder;
+        }
+
+        /// <summary>
+        /// Creates an order of type One Cancels Another based on two existing orders. When an order fills
+        /// the other one is cancelled.
+        /// </summary>
+        /// <param name="ocoOrder1">The first order in the list.</param>
+        /// <param name="ocoOrder2">The second order in the list.</param>
+        /// <returns>An an Order object with the One Cancels Another format.</returns>
+        public static Order OneCancelsAnother(Order ocoOrder1, Order ocoOrder2)
+        {
+            Order newOrder = new()
+            {
+                OrderStrategyType = Order.Enums.OrderStrategyType.OCO,
+                ChildOrderStrategies = new List<object>()
+                {
+                    Order.GetChildOrderStrategy(ocoOrder1),
+                    Order.GetChildOrderStrategy(ocoOrder2)
+                }
+            };
+            return newOrder;
+        }
+
+        /// <summary>
+        /// Creates an order that triggers a One Cancels Another order when it the trigger order is executed.
+        /// </summary>
+        /// <param name="triggerOrder">The order that triggers the OCO order.</param>
+        /// <param name="ocoOrder1">The first order in the OCO order.</param>
+        /// <param name="ocoOrder2">The second order in the OCO order.</param>
+        /// <returns>An Order object describing an order that triggers a One Cancels Another order
+        /// when it the trigger order is executed.</returns>
+        public static Order TriggerOneCancelsAnother(Order triggerOrder, Order ocoOrder1, Order ocoOrder2)
+        {
+            Order newOrder = (Order)triggerOrder.Clone();
+            Order ocoOrder = OneCancelsAnother(ocoOrder1, ocoOrder2);
+
+            // Change the main order to TRIGGER
+            newOrder.OrderStrategyType = Order.Enums.OrderStrategyType.TRIGGER;
+
+            // Get the necessary data from the triggered order and add it to the ChilOrderStrategies list
+            // of the trigger order.
+            newOrder.ChildOrderStrategies = new List<object>()
+            {
+                Order.GetChildOrderStrategy(ocoOrder)
+            };
+
+            return newOrder;
+        }
+
+        /// <summary>
+        /// Changes an existing order to a limit order.
+        /// </summary>
+        /// <param name="order">The order in question.</param>
+        /// <param name="limitPrice">The limit price for the order.</param>
+        public static void SetLimit(Order order, double limitPrice)
+        {
+            order.OrderType = Order.Enums.OrderType.LIMIT;
+            order.Price = limitPrice;
+        }
+
+        /// <summary>
+        /// Sets a stop (also known as a stop-loss) to an existing order.
+        /// </summary>
+        /// <param name="order">The order in question.</param>
+        /// <param name="stopPrice">The price at which the stop order will trigger a market order.</param>
+        /// <param name="stopPriceLinkBasis">Indicates which value will be used as the basis to trigger the stop.</param>
+        public static void SetStop(Order order, double stopPrice, Order.Enums.PriceLinkBasis stopPriceLinkBasis)
+        {
+            order.OrderType = Order.Enums.OrderType.STOP;
+            order.StopPrice = stopPrice;
+            order.StopPriceLinkBasis = stopPriceLinkBasis;
+        }
+
+        /// <summary>
+        /// Turns an order into a stop limit order.
+        /// </summary>
+        /// <param name="order">The order in question.</param>
+        /// <param name="stopPrice">The price at which the stop order will trigger a market order.</param>
+        /// <param name="limitPrice">The price of the limit order that will be placed when the stop is triggered.</param>
+        /// <param name="stopPriceLinkBasis">Indicates which value will be used as the basis to trigger the stop.</param>
+        public static void SetStopLimit(Order order, double stopPrice, double limitPrice, Order.Enums.PriceLinkBasis stopPriceLinkBasis)
+        {
+            order.OrderType = Order.Enums.OrderType.STOP_LIMIT;
+            order.StopPrice = stopPrice;
+            order.StopPriceLinkBasis = stopPriceLinkBasis;
+            order.Price= limitPrice;
+        }
+
+        /// <summary>
+        /// Turns an order into a trailing stop order.
+        /// </summary>
+        /// <param name="order">The order in question.</param>
+        /// <param name="stopPriceLinkBasis">Indicates which value will be used as the basis to trigger the stop.</param>
+        /// <param name="stopPriceLinkType">The value that will be trailed and will trigger the stop.</param>
+        /// <param name="stopPriceOffset">The offset at which the value given in stopPriceLinkType will be trailed.</param>
+        public static void SetTrailingStop(Order order, Order.Enums.PriceLinkBasis stopPriceLinkBasis, Order.Enums.PriceLinkType stopPriceLinkType,
+            double stopPriceOffset)
+        {
+            order.ComplexOrderStrategyType = Order.Enums.ComplexOrderStrategyType.NONE;
+            order.OrderType = Order.Enums.OrderType.TRAILING_STOP;
+            order.StopPriceLinkBasis = stopPriceLinkBasis;
+            order.StopPriceLinkType = stopPriceLinkType;
+            order.StopPriceOffset = stopPriceOffset;
+        }
+
+        /// <summary>
+        /// Turns an order into a trailing stop limit order.
+        /// </summary>
+        /// <param name="order">The order in question.</param>
+        /// <param name="stopPriceLinkBasis">Indicates which value will be used as the basis to trigger the stop.</param>
+        /// <param name="stopPriceLinkType">The value that will be trailed and will trigger the stop.</param>
+        /// <param name="stopPriceOffset">The offset at which the value given in stopPriceLinkType will be trailed.</param>
+        /// <param name="limitPrice">The limit price of the order that will be placed once the trail stop is triggered.</param>
+        public static void SetTrailingStopLimit(Order order, Order.Enums.PriceLinkBasis stopPriceLinkBasis, Order.Enums.PriceLinkType stopPriceLinkType,
+            double stopPriceOffset, double limitPrice)
+        {
+            order.ComplexOrderStrategyType = Order.Enums.ComplexOrderStrategyType.NONE;
+            order.OrderType = Order.Enums.OrderType.TRAILING_STOP_LIMIT;
+            order.StopPriceLinkBasis = stopPriceLinkBasis;
+            order.StopPriceLinkType = stopPriceLinkType;
+            order.StopPriceOffset = stopPriceOffset;
+            order.Price = limitPrice;
         }
     }
 }

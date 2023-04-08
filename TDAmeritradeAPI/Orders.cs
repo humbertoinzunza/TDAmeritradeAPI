@@ -1,10 +1,11 @@
 ﻿using JsonSubTypes;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
+using Newtonsoft.Json.Serialization;
 
 namespace TDAmeritradeAPI
 {
-    public class Order
+    public class Order : ICloneable
     {
         public class Enums
         {
@@ -110,6 +111,9 @@ namespace TDAmeritradeAPI
             public Enums.QuantityType? QuantityType { get; set; }
         }
 
+        // Private variables
+        private static readonly JsonSerializerSettings _serializerSettings = new();
+
         // Properties
         public Enums.Session? Session { get; set; }
         public Enums.Duration? Duration { get; set; }
@@ -147,6 +151,38 @@ namespace TDAmeritradeAPI
         public List<object>? ReplacingOrderCollection { get; set; }
         public List<object>? ChildOrderStrategies { get; set; }
         public string? StatusDescription { get; set; }
+        public Order()
+        {
+            _serializerSettings.ContractResolver = new CamelCasePropertyNamesContractResolver();
+            _serializerSettings.NullValueHandling = NullValueHandling.Ignore;
+        }
+        public string AsJson()
+        {
+            string jsonString = JsonConvert.SerializeObject(this, _serializerSettings);
+            return jsonString;
+        }
+        public object Clone()
+        {
+            Order clone = (Order)MemberwiseClone();
+            clone.OrderLegCollection = OrderLegCollection is null ? null : new List<OrderLeg>(OrderLegCollection);
+            clone.OrderActivityCollection = OrderActivityCollection is null ? null : new List<Execution>(OrderActivityCollection);
+            clone.ReplacingOrderCollection = ReplacingOrderCollection is null ? null : new List<object>(ReplacingOrderCollection);
+            clone.ChildOrderStrategies = ChildOrderStrategies is null ? null : new List<object>(ChildOrderStrategies);
+            return clone;
+        }
+        internal static Order GetChildOrderStrategy(Order order)
+        {
+            Order newOrder = new() {
+                OrderType = order.OrderType,
+                Session = order.Session,
+                Price = order.Price,
+                Duration = order.Duration,
+                OrderStrategyType = order.OrderStrategyType,
+                OrderLegCollection = order.OrderLegCollection is not null ? new List<OrderLeg>(order.OrderLegCollection) : null
+        };
+            
+            return newOrder;
+        }
     }
 
     public class Execution

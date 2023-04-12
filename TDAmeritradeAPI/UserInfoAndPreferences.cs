@@ -1,5 +1,5 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
+﻿using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace TDAmeritradeAPI
 {
@@ -21,7 +21,6 @@ namespace TDAmeritradeAPI
     {
         public class Enums
         {
-            [JsonConverter(typeof(StringEnumConverter))]
             public enum OptionTradingLevel { COVERED, FULL, LONG, SPREAD, NONE }
         }
         public bool Apex { get; set; }
@@ -37,31 +36,25 @@ namespace TDAmeritradeAPI
 
     public class Preferences
     {
+        private readonly JsonSerializerOptions _serializeOptions;
+
         // Enums
         public class Enums
         {
-            [JsonConverter(typeof(StringEnumConverter))]
             public enum EquityOrderLegInstruction { BUY, SELL, BUY_TO_COVER, SELL_SHORT, NONE };
 
-            [JsonConverter(typeof(StringEnumConverter))]
             public enum EquityOrderType { MARKET, LIMIT, STOP, STOP_LIMIT, TRAILING_STOP, MARKET_ON_CLOSE, NONE }
 
-            [JsonConverter(typeof(StringEnumConverter))]
             public enum EquityOrderPriceLinkType { VALUE, PERCENT, NONE }
 
-            [JsonConverter(typeof(StringEnumConverter))]
             public enum EquityOrderDuration { DAY, GOOD_TILL_CANCEL, NONE }
 
-            [JsonConverter(typeof(StringEnumConverter))]
             public enum EquityOrderMarketSession { AM, PM, NORMAL, SEAMLESS, NONE }
 
-            [JsonConverter(typeof(StringEnumConverter))]
             public enum TaxLotMethod { FIFO, LIFO, HIGH_COST, LOW_COST, MINIMUM_TAX, AVERAGE_COST, NONE }
 
-            [JsonConverter(typeof(StringEnumConverter))]
             public enum AdvancedToolLaunch { TA, N, Y, TOS, NONE, CC2 }
 
-            [JsonConverter(typeof(StringEnumConverter))]
             public enum AuthTokenTimeout { FIFTY_FIVE_MINUTES, TWO_HOURS, FOUR_HOURS, EIGHT_HOURS }
         }
 
@@ -80,6 +73,24 @@ namespace TDAmeritradeAPI
         public Enums.TaxLotMethod EquityTaxLotMethod { get; set; }
         public Enums.AdvancedToolLaunch DefaultAdvancedToolLaunch { get; set; }
         public Enums.AuthTokenTimeout AuthTokenTimeout { get; set; }
+
+        public Preferences()
+        {
+            _serializeOptions = new JsonSerializerOptions()
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                WriteIndented = true,
+                Converters =
+                {
+                    new JsonStringEnumConverter()
+                }
+            };
+        }
+
+        public string ToJson()
+        {
+            return JsonSerializer.Serialize(this, _serializeOptions);
+        }
     }
 
     public class UserPrincipal
@@ -89,7 +100,6 @@ namespace TDAmeritradeAPI
         {
             public enum AdditionalField { StreamerSubscriptionKeys, StreamerConnectionInfo, Preferences, SurrogateIds }
 
-            [JsonConverter(typeof(StringEnumConverter))]
             public enum ProfessionalStatusTypes { PROFESSIONAL, NON_PROFESSIONAL, UNKNOWN_STATUS }
         }
         // Structs

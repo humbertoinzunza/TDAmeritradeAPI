@@ -7,7 +7,7 @@ namespace TDAmeritradeAPI
         public enum OptionType { Call, Put }
         public enum PositionEffect { ToOpen, ToClose }
         public enum NetEffect { NetDebit, NetCredit, NetZero };
-        private enum SpreadType { Vertical, Horizontal, Custom }
+        public enum SpreadType { Vertical, Horizontal, Custom }
 
         private static readonly Order.Enums.Instruction[] _validEquityInstruction = { Order.Enums.Instruction.BUY, Order.Enums.Instruction.SELL,
             Order.Enums.Instruction.BUY_TO_COVER, Order.Enums.Instruction.SELL_SHORT };
@@ -249,7 +249,7 @@ namespace TDAmeritradeAPI
         /// <param name="netEffect">It indicates if the order is net debit, net credit, or net zero. Set to null for a market order.</param>
         /// <returns>An order for a spread.</returns>
         /// <remarks>The user must make sure to choose the right option for netEffect if they don't want a market order.</remarks>
-        private static Order CreateSpread(Option longOption, uint longQuantity, Option shortOption, uint shortQuantity, PositionEffect positionEffect,
+        public static Order CreateSpread(Option longOption, uint longQuantity, Option shortOption, uint shortQuantity, PositionEffect positionEffect,
             SpreadType spreadType, Order.Enums.Duration duration = Order.Enums.Duration.DAY, NetEffect? netEffect = null, double? price = null)
         {
             if (price != null && netEffect == null)

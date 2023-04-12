@@ -1,5 +1,4 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
+﻿using System.Text.Json;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
 using System.Diagnostics;
@@ -9,7 +8,6 @@ using System.Runtime.InteropServices;
 using System.Timers;
 using System.Web;
 
-
 namespace TDAmeritradeAPI
 {
     public class Client
@@ -18,8 +16,19 @@ namespace TDAmeritradeAPI
         private System.Timers.Timer? _refreshTokenTimer = null;
         private readonly HttpClient _httpClient = new();
         private OAuth2Data _oAuth2Data = new();
+        private readonly JsonSerializerOptions _orderSerializerOptions;
         private enum Token { AccessToken, RefreshToken };
 
+        public Client()
+        {
+            _orderSerializerOptions = new JsonSerializerOptions()
+            {
+                Converters =
+                {
+                    new InstrumentConverter()
+                }
+            };
+        }
         public async Task Init()
         {
 
@@ -336,9 +345,9 @@ namespace TDAmeritradeAPI
             string stringResponse = await HttpRequest(endpoint, HttpMethod.Post, parameters, false, false).ConfigureAwait(false);
 
             // Turn the response into a dictionary
-            Dictionary<string, string>? jsonResponse = JsonConvert.DeserializeObject<Dictionary<string, string>>(stringResponse);
+            EASObject? easObject = JsonSerializer.Deserialize<EASObject>(stringResponse);
             // Verify the response is not null
-            if (jsonResponse == null)
+            if (easObject is null)
                 throw new NullReferenceException("Error. The PostAccessToken function did not retrieve a proper response from the server.");
 
             // If we are only getting a refresh token in the response    
@@ -348,14 +357,14 @@ namespace TDAmeritradeAPI
                 if (parameters["access_type"] == "offline")
                 {
                     Debug.WriteLine("New refresh token obtained.");
-                    _oAuth2Data.RefreshToken = jsonResponse["refresh_token"];
+                    _oAuth2Data.RefreshToken = easObject.RefreshToken;
                     _oAuth2Data.WriteTokenExpiration(OAuth2Data.TokenType.RefreshToken);
                 }
                 // Only access token created
                 else if (parameters["access_type"] == "")
                 {
                     Debug.WriteLine("New access token obtained.");
-                    _oAuth2Data.AccessToken = jsonResponse["access_token"];
+                    _oAuth2Data.AccessToken = easObject.AccessToken;
                     _oAuth2Data.WriteTokenExpiration(OAuth2Data.TokenType.AccessToken);
                     // Change the default authorization header
                 }
@@ -363,9 +372,9 @@ namespace TDAmeritradeAPI
             else if (parameters["grant_type"] == "authorization_code" && parameters["access_type"] == "offline")
             {
                 Debug.WriteLine("New set of tokens obtained.");
-                _oAuth2Data.AccessToken = jsonResponse["access_token"];
+                _oAuth2Data.AccessToken = easObject.AccessToken;
                 _oAuth2Data.WriteTokenExpiration(OAuth2Data.TokenType.AccessToken);
-                _oAuth2Data.RefreshToken = jsonResponse["refresh_token"];
+                _oAuth2Data.RefreshToken = easObject.RefreshToken;
                 _oAuth2Data.WriteTokenExpiration(OAuth2Data.TokenType.RefreshToken);
             }
         }
@@ -778,6 +787,7 @@ namespace TDAmeritradeAPI
          *                                        End Market Hours                                       *
          * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+        #region User Info & Preferences
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
          *                                     User Info & Preferences                                   *
          * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -789,11 +799,13 @@ namespace TDAmeritradeAPI
         /// <returns>A JSON formatted string containing the Preferences for the accounts.</returns>
         /// <remarks>It is possible to deserialize the JSON using JsonConvert into a Preferences struct.
         /// However, make sure to use the appropriate ContractResolver to parse the camel case.</remarks>
-        public async Task<string> GetPreferences(string accountId)
+        public async Task<Preferences?> GetPreferences(string accountId)
         {
             string endpoint = $"https://api.tdameritrade.com/v1/accounts/{accountId}/preferences";
 
-            return await HttpRequest(endpoint, HttpMethod.Get).ConfigureAwait(false);
+            string jsonResponse = await HttpRequest(endpoint, HttpMethod.Get).ConfigureAwait(false);
+
+            return JsonSerializer.Deserialize<Preferences>(jsonResponse);
         }
 
         /// <summary>
@@ -863,14 +875,7 @@ namespace TDAmeritradeAPI
 
             string endpoint = $"https://api.tdameritrade.com/v1/accounts/{accountId}/preferences";
 
-            string jsonParameters = JsonConvert.SerializeObject(preferences, new JsonSerializerSettings()
-            {
-                NullValueHandling = NullValueHandling.Ignore,
-                ContractResolver = new CamelCasePropertyNamesContractResolver()
-
-            });
-
-            await HttpRequest(endpoint, HttpMethod.Put, jsonParameters).ConfigureAwait(false);
+            await HttpRequest(endpoint, HttpMethod.Put, preferences.ToJson()).ConfigureAwait(false);
 
             Console.WriteLine("Preferences updated successfully.");
         }
@@ -878,9 +883,11 @@ namespace TDAmeritradeAPI
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
          *                                  End User Info & Preferences                                  *
          * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+        #endregion
 
+        #region Orders
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-         *                                             Trading                                           *
+         *                                             Orders                                            *
          * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
         /// <summary>
@@ -1033,8 +1040,8 @@ namespace TDAmeritradeAPI
         {
             if (orderId != null)
             {
-                // Validate status. Pretty empty right now since there is no documentation on
-                // which order status prevent from replacing an order.
+                // Validate status. The switch statement is pretty much empty right now since there is no documentation on
+                // which order statuses prevent from replacing an order.
                 // Only applicable if orderId is not null, meaning that the order is being replaced.
                 switch (order.Status)
                 {
@@ -1065,23 +1072,18 @@ namespace TDAmeritradeAPI
                 }
             }
 
-            string jsonParameter = JsonConvert.SerializeObject(order, new JsonSerializerSettings
-            {
-                NullValueHandling = NullValueHandling.Ignore,
-                ContractResolver = new CamelCasePropertyNamesContractResolver()
-            });
             string endpoint;
 
             if (orderId == null)
             {
                 endpoint = $"https://api.tdameritrade.com/v1/accounts/{accountId}/orders";
-                await HttpRequest(endpoint, HttpMethod.Post, jsonParameter).ConfigureAwait(false);
+                await HttpRequest(endpoint, HttpMethod.Post, order.ToJson()).ConfigureAwait(false);
                 Console.WriteLine("Order placed successfully.");
             }
             else
             {
                 endpoint = $"https://api.tdameritrade.com/v1/accounts/{accountId}/orders/{orderId}";
-                await HttpRequest(endpoint, HttpMethod.Put, jsonParameter).ConfigureAwait(false);
+                await HttpRequest(endpoint, HttpMethod.Put, order.ToJson()).ConfigureAwait(false);
                 Console.WriteLine("Order replaced successfully.");
             }
         }
@@ -1100,8 +1102,95 @@ namespace TDAmeritradeAPI
         }
 
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-         *                                           End Trading                                         *
+         *                                           End Orders                                          *
          * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+        #endregion
+
+        #region Saved Orders
+        /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+         *                                          Saved Orders                                         *
+         * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+        /// <summary>
+        /// Save an order for a specific account.
+        /// </summary>
+        /// <param name="accountId">The account's ID.</param>
+        /// <param name="order">The order to be saved.</param>
+        /// <returns>Void.</returns>
+        public async Task SaveOrder(string accountId, Order order)
+        {
+            string endpoint = $"https://api.tdameritrade.com/v1/accounts/{accountId}/savedorders";
+
+            await HttpRequest(endpoint, HttpMethod.Post, order.ToJson()).ConfigureAwait(false);
+
+            Console.WriteLine("Order saved successfully.");
+        }
+
+        /// <summary>
+        /// Delete a specific saved order for a specific account.
+        /// </summary>
+        /// <param name="accountId">The account's ID.</param>
+        /// <param name="savedOrderId">The saved order's ID.</param>
+        /// <returns>Void.</returns>
+        public async Task DeleteSavedOrder(string accountId, string savedOrderId)
+        {
+            string endpoint = $"https://api.tdameritrade.com/v1/accounts/{accountId}/savedorders/{savedOrderId}";
+
+            await HttpRequest(endpoint, HttpMethod.Delete).ConfigureAwait(false);
+
+            Console.WriteLine($"Saved order with Id {savedOrderId} deleted successfully.");
+        }
+
+        /// <summary>
+        /// Gets the specific saved order by its ID, for a specific account.
+        /// </summary>
+        /// <param name="accountId">The account's ID.</param>
+        /// <param name="savedOrderId">The saved order's ID.</param>
+        /// <returns>An Order object.</returns>
+        public async Task<Order?> GetSavedOrder(string accountId, string savedOrderId)
+        {
+            string endpoint = $"https://api.tdameritrade.com/v1/accounts/{accountId}/savedorders/{savedOrderId}";
+
+            string jsonOrder = await HttpRequest(endpoint, HttpMethod.Get).ConfigureAwait(false);
+
+            return JsonSerializer.Deserialize<Order>(jsonOrder);
+        }
+
+        /// <summary>
+        /// Gets the saved orders for a specific account.
+        /// </summary>
+        /// <param name="accountId">The account's ID.</param>
+        /// <param name="savedOrderId">The saved order's ID.</param>
+        /// <returns>A list of Order objects.</returns>
+        public async Task<List<Order>?> GetSavedOrdersByPath(string accountId, string savedOrderId)
+        {
+            string endpoint = $"https://api.tdameritrade.com/v1/accounts/{accountId}/savedorders/{savedOrderId}";
+
+            string jsonOrder = await HttpRequest(endpoint, HttpMethod.Get).ConfigureAwait(false);
+
+            return JsonSerializer.Deserialize<List<Order>>(jsonOrder);
+        }
+
+        /// <summary>
+        /// Replace an existing saved order for an account. The existing saved order will be replaced by the new order.
+        /// </summary>
+        /// <param name="accountId">The account's ID.</param>
+        /// <param name="savedOrderId">The saved order's ID.</param>
+        /// <param name="order">The order that will replace the old order.</param>
+        /// <returns>Void.</returns>
+        public async Task ReplaceSavedOrder(string accountId, string savedOrderId, Order order)
+        {
+            string endpoint = $"https://api.tdameritrade.com/v1/accounts/{accountId}/savedorders/{savedOrderId}";
+
+            await HttpRequest(endpoint, HttpMethod.Put, order.ToJson()).ConfigureAwait(false);
+
+            Console.WriteLine($"Saved order with Id {savedOrderId} replaced successfully.");
+        }
+
+        /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+         *                                        End Saved Orders                                       *
+         * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+        #endregion
 
     }
 }

@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
 using System.Diagnostics;
@@ -7,6 +8,8 @@ using System.Net.Http.Headers;
 using System.Runtime.InteropServices;
 using System.Timers;
 using System.Web;
+using Yoh.Text.Json.NamingPolicies;
+using System.Configuration;
 
 namespace TDAmeritradeAPI
 {
@@ -15,24 +18,46 @@ namespace TDAmeritradeAPI
         private bool _firstTimer = true;
         private System.Timers.Timer? _refreshTokenTimer = null;
         private readonly HttpClient _httpClient = new();
-        private OAuth2Data _oAuth2Data = new();
-        private readonly JsonSerializerOptions _orderSerializerOptions;
+        private OAuth2Data       _oAuth2Data;
+        private readonly JsonSerializerOptions _serializerOptions;
         private enum Token { AccessToken, RefreshToken };
 
         public Client()
         {
-            _orderSerializerOptions = new JsonSerializerOptions()
+            _serializerOptions = new JsonSerializerOptions()
             {
-                Converters =
-                {
-                    new InstrumentConverter()
-                }
+                Converters = { new InstrumentConverter() },
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+                PropertyNamingPolicy = JsonNamingPolicies.SnakeCaseLower
             };
+            // Read the file paths for the OAuth2.0 data
+            // Tell the compiler to ignore possible null assignment
+            string authFilePath = ConfigurationManager.AppSettings["AuthorizationFile"]!;
+            // If the strings are in fact null throw an exception
+            if (authFilePath == null)
+                throw new NullReferenceException("Error. Unable to read from configuration file.\n\n");
+            try
+            {
+                using StreamReader sr = new(authFilePath);
+
+                string oAuth2DataString = sr.ReadToEnd();
+
+                // Deserialize the string into the appropriate datatype
+                _oAuth2Data = JsonSerializer.Deserialize<OAuth2Data>(oAuth2DataString)!;
+            }
+            catch (FileNotFoundException)
+            {
+                Console.WriteLine($"Error. The attempt to read the authorization file failed.\n\n");
+                _oAuth2Data = new OAuth2Data();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error. The attempt to read the authorization file failed.\n\n{ex.Message}");
+                _oAuth2Data = new OAuth2Data();
+            }
         }
         public async Task Init()
         {
-
-            _oAuth2Data = new();
             // If we don't have the 4 pieces of data necessary to connect using OAuth2.0 then get them from the user
             if (_oAuth2Data.AccessToken == null || _oAuth2Data.ClientID == null ||
                 _oAuth2Data.RedirectURI == null || _oAuth2Data.RefreshToken == null)
@@ -77,12 +102,14 @@ namespace TDAmeritradeAPI
                 Console.WriteLine("ERROR. Client ID not found.\n\n");
                 Console.Write("Please enter the Client ID (consumer key): ");
                 _oAuth2Data.ClientID = Console.ReadLine()!.Trim();
+                Console.Write("\n\n");
             }
             if (_oAuth2Data.RedirectURI == null || _oAuth2Data.RedirectURI.Length == 0)
             {
                 Console.WriteLine("ERROR. Redirect URI not found.\n\n");
                 Console.Write("Please enter the redirect URI: ");
                 _oAuth2Data.RedirectURI = Console.ReadLine()!.Trim();
+                Console.Write("\n\n");
             }
 
             // Save the changes to the file
@@ -98,20 +125,102 @@ namespace TDAmeritradeAPI
 
             // Set chrome options
             ChromeOptions options = new();
-            //options.AddArgument("--log-level=0");
-            options.AddArgument("--start-maximized");
+
+            options.AddArgument("headless");
+            options.AddArgument("--silent");
+            options.AddArgument("log-level=3");
+            ChromeDriverService service = ChromeDriverService.CreateDefaultService("chromedriver.exe");
+            service.SuppressInitialDiagnosticInformation = true;
 
             // Instantiate a Chromedriver object and set the directory path of the driver
-            ChromeDriver chromedriver = new("chromedriver.exe", options);
+            ChromeDriver chromedriver = new(service, options);
 
             // Set the current URL to the Auth URL
             chromedriver.Navigate().GoToUrl(auth_url);
 
-            Console.WriteLine("Enter your TD Ameritrade API credentials to obtain an authorization code. " +
-                "The web driver will timeout in 3 minutes.");
 
-            // Use a WebDriverWait to wait until the URL returns the authorization code. Allow for a time window of 3 minutes
-            WebDriverWait webDriverWait = new(chromedriver, TimeSpan.FromSeconds(180));
+            // Enter username
+            IWebElement tempElement = chromedriver.FindElement(By.Id("username0"));
+            Console.Write("Enter your TD Ameritrade User ID: ");
+            string tempEntry = Console.ReadLine()!.Trim();
+            tempElement.SendKeys(tempEntry);
+            //Enter password
+            tempElement = chromedriver.FindElement(By.Id("password1"));
+            Console.Write("Enter your TD Ameritrade Password: ");
+            tempEntry = GetPassword();
+            Console.Write("\n\n");
+            tempElement.SendKeys(tempEntry);
+            // Click Continue
+            tempElement = chromedriver.FindElement(By.Id("accept"));
+            tempElement.Click();
+            // Verify that the login info was accepted
+            bool loginFailed = false;
+            try
+            {
+                loginFailed = chromedriver.FindElement(By.Id("user_message_inline")).Displayed;
+            }
+            catch (NoSuchElementException)
+            {
+                loginFailed = false;
+            }
+            // If there was an error logging in, ask the user for the username and password again
+            while (loginFailed)
+            {
+                Console.WriteLine("Log-in failed. Check your user ID and password and try again.\n\n");
+                // Enter username
+                tempElement = chromedriver.FindElement(By.Id("username0"));
+                Console.Write("Enter your TD Ameritrade User ID: ");
+                tempEntry = Console.ReadLine()!.Trim();
+                tempElement.Clear();
+                tempElement.SendKeys(tempEntry);
+                //Enter password
+                tempElement = chromedriver.FindElement(By.Id("password1"));
+                Console.Write("Enter your TD Ameritrade Password: ");
+                tempEntry = GetPassword();
+                Console.Write("\n\n");
+                tempElement.Clear();
+                tempElement.SendKeys(tempEntry);
+                // Click Continue
+                tempElement = chromedriver.FindElement(By.Id("accept"));
+                tempElement.Click();
+                // Verify that the login info was accepted
+                try
+                {
+                    loginFailed = chromedriver.FindElement(By.Id("user_message_inline")).Displayed;
+                }
+                catch (NoSuchElementException)
+                {
+                    loginFailed = false;
+                }
+            }
+
+            // Click Continue (again)
+            tempElement = chromedriver.FindElement(By.Id("accept"));
+            tempElement.Click();
+            // Read the phone number the code is going to be sent
+            tempElement = chromedriver.FindElement(By.XPath("//*[@id=\"authform\"]/main/div[2]/p[2]/strong"));
+            //*[@id="stepup_trustthisdevice0"]/div[1]/label
+            // Enter the SMS code sent
+            Console.Write($"Enter the code sent to {tempElement.Text}: ");
+            tempElement = chromedriver.FindElement(By.Id("smscode0"));
+            tempEntry = Console.ReadLine()!;
+            tempElement.SendKeys(tempEntry);
+            // Click Continue
+            tempElement = chromedriver.FindElement(By.Id("accept"));
+            tempElement.Click();
+            // Click on the radio button
+            tempElement = chromedriver.FindElement(By.XPath("//*[@id=\"stepup_trustthisdevice0\"]/div[1]/label"));
+            tempElement.Click();
+            // Click Save
+            tempElement = chromedriver.FindElement(By.Id("accept"));
+            tempElement.Click();
+            // Click Allow
+            tempElement = chromedriver.FindElement(By.Id("accept"));
+            tempElement.Click();
+
+
+            // Use a WebDriverWait to wait until the URL returns the authorization code. Allow for a time window of 15 seconds
+            WebDriverWait webDriverWait = new(chromedriver, TimeSpan.FromSeconds(15));
             webDriverWait.Until(x => x.Url.Contains("code="));
 
             // Get the authorization code (everything after the 'code=' in the URL
@@ -139,6 +248,29 @@ namespace TDAmeritradeAPI
 
             // Save the expiration time of both tokens
             _oAuth2Data.WriteTokenExpiration(OAuth2Data.TokenType.Both);
+        }
+
+        private static string GetPassword()
+        {
+            string pass = string.Empty;
+            ConsoleKey key;
+            do
+            {
+                var keyInfo = Console.ReadKey(intercept: true);
+                key = keyInfo.Key;
+
+                if (key == ConsoleKey.Backspace && pass.Length > 0)
+                {
+                    Console.Write("\b \b");
+                    pass = pass[0..^1];
+                }
+                else if (!char.IsControl(keyInfo.KeyChar))
+                {
+                    Console.Write("*");
+                    pass += keyInfo.KeyChar;
+                }
+            } while (key != ConsoleKey.Enter);
+            return pass;
         }
 
         /// <summary>
@@ -345,7 +477,7 @@ namespace TDAmeritradeAPI
             string stringResponse = await HttpRequest(endpoint, HttpMethod.Post, parameters, false, false).ConfigureAwait(false);
 
             // Turn the response into a dictionary
-            EASObject? easObject = JsonSerializer.Deserialize<EASObject>(stringResponse);
+            EASObject? easObject =  JsonSerializer.Deserialize<EASObject>(stringResponse, _serializerOptions);
             // Verify the response is not null
             if (easObject is null)
                 throw new NullReferenceException("Error. The PostAccessToken function did not retrieve a proper response from the server.");
@@ -591,6 +723,8 @@ namespace TDAmeritradeAPI
          *                                         End Price History                                     *
          * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+        #region Watchlists
+
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
          *                                          Watchlists                                           *
          * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -634,22 +768,26 @@ namespace TDAmeritradeAPI
         /// <param name="accountId">Account ID associated with the watchlist.</param>
         /// <param name="watchlistId">ID of the watchlist of interest.</param>
         /// <returns>Returns the watchlist of interest in the given account.</returns>
-        public async Task<string> GetWatchlist(string accountId, string watchlistId)
+        public async Task<List<Watchlist>> GetWatchlist(string accountId, string watchlistId)
         {
             string endpoint = $"https://api.tdameritrade.com/v1/accounts/{accountId}/watchlists/{watchlistId}";
 
-            return await HttpRequest(endpoint, HttpMethod.Get).ConfigureAwait(false);
+            string watchlists = await HttpRequest(endpoint, HttpMethod.Get).ConfigureAwait(false);
+
+            return JsonSerializer.Deserialize<List<Watchlist>>(watchlists)!;
         }
 
         /// <summary>
         /// Gets all the watchlists of all the linked accounts.
         /// </summary>
         /// <returns>Returns all watchlists from all the linked accounts.</returns>
-        public async Task<string> GetWatchlistForMultipleAccounts()
+        public async Task<List<Watchlist>> GetWatchlistsForMultipleAccounts()
         {
             string endpoint = $"https://api.tdameritrade.com/v1/accounts/watchlists";
 
-            return await HttpRequest(endpoint, HttpMethod.Get).ConfigureAwait(false);
+            string watchlists = await HttpRequest(endpoint, HttpMethod.Get).ConfigureAwait(false);
+
+            return JsonSerializer.Deserialize<List<Watchlist>>(watchlists)!;
         }
 
         /// <summary>
@@ -657,11 +795,13 @@ namespace TDAmeritradeAPI
         /// </summary>
         /// <param name="accountId">Account ID associated with the watchlists.</param>
         /// <returns>Returns all watchlists of the given account.</returns>
-        public async Task<string> GetWatchlistForSingleAccount(string accountId)
+        public async Task<List<Watchlist>> GetWatchlistsForSingleAccount(string accountId)
         {
             string endpoint = $"https://api.tdameritrade.com/v1/accounts/{accountId}/watchlists";
 
-            return await HttpRequest(endpoint, HttpMethod.Get).ConfigureAwait(false);
+            string watchlists = await HttpRequest(endpoint, HttpMethod.Get).ConfigureAwait(false);
+
+            return JsonSerializer.Deserialize<List<Watchlist>>(watchlists)!;
         }
 
         public async Task ReplaceWatchlist(string accountId, string watchlistId, string watchlistName,
@@ -701,6 +841,9 @@ namespace TDAmeritradeAPI
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
          *                                         End Watchlists                                        *
          * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+        #endregion
+
+        #region Accounts
 
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
          *                                             Accounts                                          *
@@ -713,7 +856,7 @@ namespace TDAmeritradeAPI
         /// <param name="getPositions">Set to true if the positions in the account must be obtained.</param>
         /// <param name="getOrders">Set to true if the orders in the account must be obtained.</param>
         /// <returns>A string with the account balances, positions, and orders for the given account.</returns>
-        public async Task<string> GetAccount(string accountId, bool getPositions = false, bool getOrders = false)
+        private async Task<string> GetAccountHelper(string accountId, bool getPositions = false, bool getOrders = false)
         {
             // Small trick so this method is easily reused in GetAccounts() method
             if (accountId != "")
@@ -738,20 +881,48 @@ namespace TDAmeritradeAPI
         }
 
         /// <summary>
-        /// Gets account balances, positions, and orders for all linked accounts.
+        /// Gets account balances, positions, and orders for a specific account.
         /// </summary>
         /// <param name="accountId">The account ID.</param>
         /// <param name="getPositions">Set to true if the positions in the account must be obtained.</param>
         /// <param name="getOrders">Set to true if the orders in the account must be obtained.</param>
-        /// <returns>A string with the account balances, positions, and orders for the given account.</returns>
-        public async Task<string> GetAccounts(bool getPositions = false, bool getOrders = false)
+        /// <returns>A SecuritiesAccount object with the account balances, positions, and orders for the given account.</returns>
+        public async Task<SecuritiesAccount> GetAccount(string accountId, bool getPositions, bool getOrders)
         {
-            return await GetAccount("", getPositions, getOrders).ConfigureAwait(false);
+            string account = await GetAccountHelper(accountId, getPositions, getOrders).ConfigureAwait(false);
+
+            // Temporary dictionary to extract the Securities Account object and ignore the name of the class in the JSON file
+            Dictionary<string, SecuritiesAccount>? temp = JsonSerializer.Deserialize<Dictionary<string, SecuritiesAccount>>(account);
+
+            return temp!["securitiesAccount"];
+        }
+
+        /// <summary>
+        /// Gets account balances, positions, and orders for all linked accounts.
+        /// </summary>
+        /// <param name="getPositions">Set to true if the positions in the account must be obtained.</param>
+        /// <param name="getOrders">Set to true if the orders in the account must be obtained.</param>
+        /// <returns>A list of SecuritiesAccount objects with the account balances, positions, and orders for the given account.</returns>
+        public async Task<List<SecuritiesAccount>> GetAccounts(bool getPositions = false, bool getOrders = false)
+        {
+            string accounts = await GetAccountHelper("", getPositions, getOrders).ConfigureAwait(false);
+
+            List<Dictionary<string, SecuritiesAccount>>? accountsList =
+                JsonSerializer.Deserialize<List<Dictionary<string, SecuritiesAccount>>>(accounts);
+            List<SecuritiesAccount> list = new();
+
+            if (accountsList != null)
+                foreach (Dictionary<string, SecuritiesAccount> dict in accountsList)
+                    list.Add(dict["securitiesAccount"]);
+
+            return list;
         }
 
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
          *                                          End Accounts                                         *
          * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+        #endregion
 
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
          *                                         Market Hours                                          *
@@ -912,11 +1083,14 @@ namespace TDAmeritradeAPI
         /// <remarks>
         /// The JSON-formatted string can be deserialized into an Order object.
         /// </remarks>
-        public async Task<string> GetOrder(string accountId, string orderId)
+        public async Task<Order> GetOrder(string accountId, string orderId)
         {
             string endpoint = $"https://api.tdameritrade.com/v1/accounts/{accountId}/orders/{orderId}";
 
-            return await HttpRequest(endpoint, HttpMethod.Get).ConfigureAwait(false);
+            string order = await HttpRequest(endpoint, HttpMethod.Get).ConfigureAwait(false);
+
+            return JsonSerializer.Deserialize<Order>(order, _serializerOptions)!;
+
         }
 
         /// <summary>
@@ -979,17 +1153,19 @@ namespace TDAmeritradeAPI
         /// <param name="startDate">No order before this date will be returned.</param>
         /// <param name="endDate">No order past this date will be returned.</param>
         /// <param name="status">Specifies the type of orders that will be fetched.</param>
-        /// <returns>A JSON-formatted string containing a list of orders.</returns>
+        /// <returns>A list of Order objects..</returns>
         /// <remarks>
         /// If account ID isn't specified orders will be returned for all linked accounts.
         /// If 'startDate' is not sent, the default 'endDate' would be the current day.
         /// If 'startDate' is not sent, the default 'startDate' would be 60 days from 'endDate'.
         /// The JSON-formatted string can be deserialized into a List of Order objects.
         /// </remarks>
-        public async Task<string> GetOrdersByPath(string accountId, int? maxResults = null,
+        public async Task<List<Order>> GetOrdersByPath(string accountId, int? maxResults = null,
             DateTime? startDate = null, DateTime? endDate = null, Order.Enums.Status? status = null)
         {
-            return await GetOrders(true, accountId, maxResults, startDate, endDate, status).ConfigureAwait(false);
+            string orders = await GetOrders(true, accountId, maxResults, startDate, endDate, status).ConfigureAwait(false);
+
+            return JsonSerializer.Deserialize<List<Order>>(orders, _serializerOptions)!;
         }
 
         /// <summary>
@@ -1000,17 +1176,19 @@ namespace TDAmeritradeAPI
         /// <param name="startDate">No order before this date will be returned.</param>
         /// <param name="endDate">No order past this date will be returned.</param>
         /// <param name="status">Specifies the type of orders that will be fetched.</param>
-        /// <returns>A JSON-formatted string containing a list of orders.</returns>
+        /// <returns>A list of Order objects..</returns>
         /// <remarks>
         /// If account ID isn't specified orders will be returned for all linked accounts.
         /// If 'startDate' is not sent, the default 'endDate' would be the current day.
         /// If 'startDate' is not sent, the default 'startDate' would be 60 days from 'endDate'.
         /// The JSON-formatted string can be deserialized into a List of Order objects.
         /// </remarks>
-        public async Task<string> GetOrdersByQuery(string accountId, int? maxResults = null,
+        public async Task<List<Order>> GetOrdersByQuery(string accountId, int? maxResults = null,
             DateTime? startDate = null, DateTime? endDate = null, Order.Enums.Status? status = null)
         {
-            return await GetOrders(false, accountId, maxResults, startDate, endDate, status).ConfigureAwait(false);
+            string orders = await GetOrders(true, accountId, maxResults, startDate, endDate, status).ConfigureAwait(false);
+
+            return JsonSerializer.Deserialize<List<Order>>(orders, _serializerOptions)!;
         }
 
         /// <summary>
@@ -1117,7 +1295,7 @@ namespace TDAmeritradeAPI
         /// <param name="accountId">The account's ID.</param>
         /// <param name="order">The order to be saved.</param>
         /// <returns>Void.</returns>
-        public async Task SaveOrder(string accountId, Order order)
+        public async Task CreateSavedOrder(string accountId, Order order)
         {
             string endpoint = $"https://api.tdameritrade.com/v1/accounts/{accountId}/savedorders";
 
@@ -1147,13 +1325,13 @@ namespace TDAmeritradeAPI
         /// <param name="accountId">The account's ID.</param>
         /// <param name="savedOrderId">The saved order's ID.</param>
         /// <returns>An Order object.</returns>
-        public async Task<Order?> GetSavedOrder(string accountId, string savedOrderId)
+        public async Task<Order> GetSavedOrder(string accountId, string savedOrderId)
         {
             string endpoint = $"https://api.tdameritrade.com/v1/accounts/{accountId}/savedorders/{savedOrderId}";
 
             string jsonOrder = await HttpRequest(endpoint, HttpMethod.Get).ConfigureAwait(false);
 
-            return JsonSerializer.Deserialize<Order>(jsonOrder);
+            return JsonSerializer.Deserialize<Order>(jsonOrder, _serializerOptions)!;
         }
 
         /// <summary>
@@ -1162,13 +1340,13 @@ namespace TDAmeritradeAPI
         /// <param name="accountId">The account's ID.</param>
         /// <param name="savedOrderId">The saved order's ID.</param>
         /// <returns>A list of Order objects.</returns>
-        public async Task<List<Order>?> GetSavedOrdersByPath(string accountId, string savedOrderId)
+        public async Task<List<Order>> GetSavedOrdersByPath(string accountId, string savedOrderId)
         {
             string endpoint = $"https://api.tdameritrade.com/v1/accounts/{accountId}/savedorders/{savedOrderId}";
 
             string jsonOrder = await HttpRequest(endpoint, HttpMethod.Get).ConfigureAwait(false);
 
-            return JsonSerializer.Deserialize<List<Order>>(jsonOrder);
+            return JsonSerializer.Deserialize<List<Order>>(jsonOrder, _serializerOptions)!;
         }
 
         /// <summary>

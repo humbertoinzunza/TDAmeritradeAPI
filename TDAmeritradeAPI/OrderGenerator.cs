@@ -1,6 +1,4 @@
-﻿using static TDAmeritradeAPI.OrderGenerator;
-
-namespace TDAmeritradeAPI
+﻿namespace TDAmeritradeAPI
 {
     public class OrderGenerator
     {

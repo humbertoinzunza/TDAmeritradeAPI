@@ -64,6 +64,11 @@ namespace TDAmeritradeAPI
         }
 
         // Structs
+            public struct OrderTime
+            {
+                public string? Date { get; set; }
+                public bool? ShortFormat { get; set; }
+            }
         public class OrderLeg
         {
             public OrderLeg() { }
@@ -98,7 +103,7 @@ namespace TDAmeritradeAPI
         public Enums.Session? Session { get; set; }
         public Enums.Duration? Duration { get; set; }
         public Enums.OrderType? OrderType { get; set; }
-        public string? CancelTime { get; set; }
+        public OrderTime? CancelTime { get; set; }
         public Enums.ComplexOrderStrategyType? ComplexOrderStrategyType { get; set; }
         public double? Quantity { get; set; }
         public double? FilledQuantity { get; set; }

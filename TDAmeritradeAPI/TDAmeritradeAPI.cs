@@ -10,6 +10,7 @@ using System.Timers;
 using System.Web;
 using Yoh.Text.Json.NamingPolicies;
 using System.Configuration;
+using System.Text.Json.Serialization;
 
 namespace TDAmeritradeAPI
 {
@@ -18,7 +19,7 @@ namespace TDAmeritradeAPI
         private bool _firstTimer = true;
         private System.Timers.Timer? _refreshTokenTimer = null;
         private readonly HttpClient _httpClient = new();
-        private OAuth2Data       _oAuth2Data;
+        private readonly OAuth2Data _oAuth2Data;
         private readonly JsonSerializerOptions _serializerOptions;
         private enum Token { AccessToken, RefreshToken };
 
@@ -26,9 +27,9 @@ namespace TDAmeritradeAPI
         {
             _serializerOptions = new JsonSerializerOptions()
             {
-                Converters = { new InstrumentConverter() },
-                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
-                PropertyNamingPolicy = JsonNamingPolicies.SnakeCaseLower
+                Converters = { new JsonStringEnumConverter() },
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                PropertyNameCaseInsensitive = true
             };
             // Read the file paths for the OAuth2.0 data
             // Tell the compiler to ignore possible null assignment
@@ -116,7 +117,7 @@ namespace TDAmeritradeAPI
             _oAuth2Data.SaveChanges();
 
             // Generate and encode the Auth URL as explained in https://developer.tdameritrade.com/content/authentication-faq
-            string auth_url = $"https://auth.tdameritrade.com/auth?response_type=code&redirect_uri=" +
+            string authURL = $"https://auth.tdameritrade.com/auth?response_type=code&redirect_uri=" +
                 $"{HttpUtility.UrlEncode(_oAuth2Data.RedirectURI)}" +
                 $"&client_id={HttpUtility.UrlEncode(_oAuth2Data.ClientID)}%40AMER.OAUTHAP";
 
@@ -136,91 +137,132 @@ namespace TDAmeritradeAPI
             ChromeDriver chromedriver = new(service, options);
 
             // Set the current URL to the Auth URL
-            chromedriver.Navigate().GoToUrl(auth_url);
+            chromedriver.Navigate().GoToUrl(authURL);
 
 
             // Enter username
-            IWebElement tempElement = chromedriver.FindElement(By.Id("username0"));
             Console.Write("Enter your TD Ameritrade User ID: ");
-            string tempEntry = Console.ReadLine()!.Trim();
-            tempElement.SendKeys(tempEntry);
+            string usn = Console.ReadLine()!.Trim();
+            chromedriver.FindElement(By.Id("username0")).SendKeys(usn);
             //Enter password
-            tempElement = chromedriver.FindElement(By.Id("password1"));
             Console.Write("Enter your TD Ameritrade Password: ");
-            tempEntry = GetPassword();
+            string pwd = GetPassword();
             Console.Write("\n\n");
-            tempElement.SendKeys(tempEntry);
+            chromedriver.FindElement(By.Id("password1")).SendKeys(pwd);
+            // Use a WebDriverWait to wait until the Continue button can be clicked
+            WebDriverWait webDriverWait = new(chromedriver, TimeSpan.FromMilliseconds(1500));
+            webDriverWait.Until(x => x.FindElement(By.Id("accept")).Displayed);
             // Click Continue
-            tempElement = chromedriver.FindElement(By.Id("accept"));
-            tempElement.Click();
-            // Verify that the login info was accepted
-            bool loginFailed = false;
-            try
+            chromedriver.FindElement(By.Id("accept")).Click();
+            // Verify that the login was successful. If the element if="user_message_inline" is found
+            // it means that there was an error during login.
+            // There is a bug where some times the log in will fail on the first attempt, even with
+            // the right username and password. Therefore, the algorithm looks for a failed login process
+            // and does a second attempt; if it still fails, it means that the username entered the login
+            // information incorrectly.
+            webDriverWait = new(chromedriver, TimeSpan.FromSeconds(5));
+            IWebElement? searchedElement = webDriverWait.Until(driver =>
             {
-                loginFailed = chromedriver.FindElement(By.Id("user_message_inline")).Displayed;
-            }
-            catch (NoSuchElementException)
+                IWebElement element;
+                try
+                {
+                    element = driver.FindElement(By.Id("user_message_inline"));
+                    if (element.Displayed) return element;
+                }
+                catch (NoSuchElementException) { }
+
+                try
+                {
+                    element = driver.FindElement(By.Id("stepup_smsnumber0"));
+                    if (element.Displayed) return element;
+                }
+                catch (NoSuchElementException) { }
+                return null;
+            });
+            // If the searched element is null, there has been an unknown error
+            if (searchedElement is null) throw new NullReferenceException(nameof(searchedElement));
+            // Do a second login attempt
+            else if(searchedElement.GetAttribute("id") == "user_message_inline")
             {
-                loginFailed = false;
-            }
-            // If there was an error logging in, ask the user for the username and password again
-            while (loginFailed)
-            {
-                Console.WriteLine("Log-in failed. Check your user ID and password and try again.\n\n");
-                // Enter username
-                tempElement = chromedriver.FindElement(By.Id("username0"));
-                Console.Write("Enter your TD Ameritrade User ID: ");
-                tempEntry = Console.ReadLine()!.Trim();
-                tempElement.Clear();
-                tempElement.SendKeys(tempEntry);
-                //Enter password
-                tempElement = chromedriver.FindElement(By.Id("password1"));
-                Console.Write("Enter your TD Ameritrade Password: ");
-                tempEntry = GetPassword();
-                Console.Write("\n\n");
-                tempElement.Clear();
-                tempElement.SendKeys(tempEntry);
+                chromedriver.FindElement(By.Id("username0")).SendKeys(usn);
+                chromedriver.FindElement(By.Id("password1")).SendKeys(pwd);
+                // Use a WebDriverWait to wait until the Continue button can be clicked
+                webDriverWait = new(chromedriver, TimeSpan.FromMilliseconds(1500));
+                webDriverWait.Until(x => x.FindElement(By.Id("accept")).Displayed);
                 // Click Continue
-                tempElement = chromedriver.FindElement(By.Id("accept"));
-                tempElement.Click();
+                chromedriver.FindElement(By.Id("accept")).Click();
+            }
+            bool failedLogin = true;
+            string tempEntry;
+            // If there was an error logging in, ask the user for the username and password again
+            do
+            {
                 // Verify that the login info was accepted
                 try
                 {
-                    loginFailed = chromedriver.FindElement(By.Id("user_message_inline")).Displayed;
+                    chromedriver.FindElement(By.Id("stepup_smsnumber0"));
+                    failedLogin = false;
                 }
                 catch (NoSuchElementException)
                 {
-                    loginFailed = false;
+                    Console.WriteLine("Log-in failed. Check your user ID and password and try again.\n\n");
+                    // Enter username
+                    Console.Write("Enter your TD Ameritrade User ID: ");
+                    tempEntry = Console.ReadLine()!.Trim();
+                    chromedriver.FindElement(By.Id("username0")).SendKeys(tempEntry);
+                    //Enter password
+                    Console.Write("Enter your TD Ameritrade Password: ");
+                    tempEntry = GetPassword();
+                    Console.Write("\n\n");
+                    chromedriver.FindElement(By.Id("password1")).SendKeys(tempEntry);
+                    // Click Continue
+                    chromedriver.FindElement(By.Id("accept")).Click();
                 }
-            }
-
+            } while(failedLogin);
             // Click Continue (again)
-            tempElement = chromedriver.FindElement(By.Id("accept"));
-            tempElement.Click();
+            chromedriver.FindElement(By.Id("accept")).Click();
             // Read the phone number the code is going to be sent
-            tempElement = chromedriver.FindElement(By.XPath("//*[@id=\"authform\"]/main/div[2]/p[2]/strong"));
-            //*[@id="stepup_trustthisdevice0"]/div[1]/label
+            IWebElement tempElement = chromedriver.FindElement(By.XPath("//*[@id=\"authform\"]/main/div[2]/p[2]/strong"));
+            string phoneNumber = tempElement.Text;
             // Enter the SMS code sent
-            Console.Write($"Enter the code sent to {tempElement.Text}: ");
-            tempElement = chromedriver.FindElement(By.Id("smscode0"));
-            tempEntry = Console.ReadLine()!;
-            tempElement.SendKeys(tempEntry);
+            Console.Write($"Enter the code sent to {phoneNumber}: ");
+            tempEntry = GetVerificationCode();
+            Console.Write("\n\n");
+            chromedriver.FindElement(By.Id("smscode0")).SendKeys(tempEntry);
             // Click Continue
-            tempElement = chromedriver.FindElement(By.Id("accept"));
-            tempElement.Click();
+            chromedriver.FindElement(By.Id("accept")).Click();
+            // If there was an error logging in, ask the user for verification code again
+            failedLogin = true;
+            do
+            {
+                // Verify that the login info was accepted
+                try
+                {
+                    chromedriver.FindElement(By.XPath("//*[@id=\"stepup_trustthisdevice0\"]/div[1]/label"));
+                    failedLogin = false;
+                }
+                catch (NoSuchElementException)
+                {
+                    Console.WriteLine("Invalid Code. Try again.\n\n");
+                    // Enter the SMS code sent
+                    Console.Write($"Enter the code sent to {phoneNumber}: ");
+                    tempEntry = GetVerificationCode();
+                    Console.Write("\n\n");
+                    chromedriver.FindElement(By.Id("smscode0")).SendKeys(tempEntry);
+                    // Click Continue
+                    chromedriver.FindElement(By.Id("accept")).Click();
+                }
+            } while (failedLogin);
             // Click on the radio button
-            tempElement = chromedriver.FindElement(By.XPath("//*[@id=\"stepup_trustthisdevice0\"]/div[1]/label"));
-            tempElement.Click();
+            chromedriver.FindElement(By.XPath("//*[@id=\"stepup_trustthisdevice0\"]/div[1]/label")).Click();
             // Click Save
-            tempElement = chromedriver.FindElement(By.Id("accept"));
-            tempElement.Click();
+            chromedriver.FindElement(By.Id("accept")).Click();
             // Click Allow
-            tempElement = chromedriver.FindElement(By.Id("accept"));
-            tempElement.Click();
+            chromedriver.FindElement(By.Id("accept")).Click();
 
 
             // Use a WebDriverWait to wait until the URL returns the authorization code. Allow for a time window of 15 seconds
-            WebDriverWait webDriverWait = new(chromedriver, TimeSpan.FromSeconds(15));
+            webDriverWait = new(chromedriver, TimeSpan.FromSeconds(15));
             webDriverWait.Until(x => x.Url.Contains("code="));
 
             // Get the authorization code (everything after the 'code=' in the URL
@@ -248,6 +290,8 @@ namespace TDAmeritradeAPI
 
             // Save the expiration time of both tokens
             _oAuth2Data.WriteTokenExpiration(OAuth2Data.TokenType.Both);
+
+            Console.WriteLine("Access token obtained successfully.\n");
         }
 
         private static string GetPassword()
@@ -273,6 +317,29 @@ namespace TDAmeritradeAPI
             return pass;
         }
 
+        private static string GetVerificationCode()
+        {
+            string code = string.Empty;
+            ConsoleKey key;
+            do
+            {
+                ConsoleKeyInfo keyInfo = Console.ReadKey(intercept: true);
+                key = keyInfo.Key;
+
+                if (key == ConsoleKey.Backspace && code.Length > 0)
+                {
+                    Console.Write("\b \b");
+                    code = code[0..^1];
+                }
+                else if (!char.IsControl(keyInfo.KeyChar) && char.IsNumber(keyInfo.KeyChar) && code.Length < 6)
+                {
+                    Console.Write(keyInfo.KeyChar);
+                    code += keyInfo.KeyChar;
+                }
+            } while (key != ConsoleKey.Enter || code.Length < 6);
+            return code;
+        }
+
         /// <summary>
         /// Downloads the latest Selenium Chromedriver.
         /// </summary>
@@ -280,9 +347,7 @@ namespace TDAmeritradeAPI
         {
             // Check if there is already a chromedriver.exe
             if (File.Exists("chromedriver.exe"))
-            {
                 return;
-            }
 
             //This will be either chromedriver_win32.zip or chromedriver_linux64.zip depending on the OS
             string chromedrDriverType = "";
@@ -302,7 +367,7 @@ namespace TDAmeritradeAPI
             Console.WriteLine("Downloading the latest version of Chromedriver...");
 
             // Download the file
-            byte[] resultStream = await _httpClient.GetByteArrayAsync(downloadURL).ConfigureAwait(false); ;
+            byte[] resultStream = await _httpClient.GetByteArrayAsync(downloadURL).ConfigureAwait(false);
             File.WriteAllBytes("chromedriver.zip", resultStream);
 
             // Delete any old chromedriver file
@@ -394,7 +459,7 @@ namespace TDAmeritradeAPI
             response.EnsureSuccessStatusCode();
 
             // Read the response as string
-            string stringResponse = await response.Content.ReadAsStringAsync().ConfigureAwait(false); ;
+            string stringResponse = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
             return stringResponse;
         }
@@ -428,7 +493,7 @@ namespace TDAmeritradeAPI
             response.EnsureSuccessStatusCode();
 
             // Read the response as string
-            string stringResponse = await response.Content.ReadAsStringAsync().ConfigureAwait(false); ;
+            string stringResponse = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
             return stringResponse;
         }
@@ -477,7 +542,8 @@ namespace TDAmeritradeAPI
             string stringResponse = await HttpRequest(endpoint, HttpMethod.Post, parameters, false, false).ConfigureAwait(false);
 
             // Turn the response into a dictionary
-            EASObject? easObject =  JsonSerializer.Deserialize<EASObject>(stringResponse, _serializerOptions);
+            EASObject? easObject =  JsonSerializer.Deserialize<EASObject>(stringResponse,
+                new JsonSerializerOptions() { PropertyNamingPolicy = JsonNamingPolicies.SnakeCaseLower });
             // Verify the response is not null
             if (easObject is null)
                 throw new NullReferenceException("Error. The PostAccessToken function did not retrieve a proper response from the server.");
@@ -774,7 +840,7 @@ namespace TDAmeritradeAPI
 
             string watchlists = await HttpRequest(endpoint, HttpMethod.Get).ConfigureAwait(false);
 
-            return JsonSerializer.Deserialize<List<Watchlist>>(watchlists)!;
+            return JsonSerializer.Deserialize<List<Watchlist>>(watchlists, _serializerOptions)!;
         }
 
         /// <summary>
@@ -787,7 +853,7 @@ namespace TDAmeritradeAPI
 
             string watchlists = await HttpRequest(endpoint, HttpMethod.Get).ConfigureAwait(false);
 
-            return JsonSerializer.Deserialize<List<Watchlist>>(watchlists)!;
+            return JsonSerializer.Deserialize<List<Watchlist>>(watchlists, _serializerOptions)!;
         }
 
         /// <summary>
@@ -801,7 +867,7 @@ namespace TDAmeritradeAPI
 
             string watchlists = await HttpRequest(endpoint, HttpMethod.Get).ConfigureAwait(false);
 
-            return JsonSerializer.Deserialize<List<Watchlist>>(watchlists)!;
+            return JsonSerializer.Deserialize<List<Watchlist>>(watchlists, _serializerOptions)!;
         }
 
         public async Task ReplaceWatchlist(string accountId, string watchlistId, string watchlistName,
@@ -892,7 +958,7 @@ namespace TDAmeritradeAPI
             string account = await GetAccountHelper(accountId, getPositions, getOrders).ConfigureAwait(false);
 
             // Temporary dictionary to extract the Securities Account object and ignore the name of the class in the JSON file
-            Dictionary<string, SecuritiesAccount>? temp = JsonSerializer.Deserialize<Dictionary<string, SecuritiesAccount>>(account);
+            Dictionary<string, SecuritiesAccount>? temp = JsonSerializer.Deserialize<Dictionary<string, SecuritiesAccount>>(account, _serializerOptions);
 
             return temp!["securitiesAccount"];
         }
@@ -908,7 +974,7 @@ namespace TDAmeritradeAPI
             string accounts = await GetAccountHelper("", getPositions, getOrders).ConfigureAwait(false);
 
             List<Dictionary<string, SecuritiesAccount>>? accountsList =
-                JsonSerializer.Deserialize<List<Dictionary<string, SecuritiesAccount>>>(accounts);
+                JsonSerializer.Deserialize<List<Dictionary<string, SecuritiesAccount>>>(accounts, _serializerOptions);
             List<SecuritiesAccount> list = new();
 
             if (accountsList != null)

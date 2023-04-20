@@ -9,9 +9,6 @@ namespace TDAmeritradeAPI
         /// Enumarates the types of tokens used in the TD Ameritrade API class used in the WriteTokenExpiration function.
         /// </summary>
         public enum TokenType { AccessToken, Both, RefreshToken }
-
-        //private int _accessTokenExpiration;
-        //private int _refreshTokenExpiration;
         public string? AccessToken { get; set; }
         public int? AccessTokenExpiration { get; set; }
         public string? ClientID { get; set; }

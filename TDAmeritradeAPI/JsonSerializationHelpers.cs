@@ -3,14 +3,14 @@ using System.Text.Json.Serialization;
 
 namespace TDAmeritradeAPI
 {
-    public class InstrumentConverter : JsonConverter<Instrument>
+    public class OrderInstrumentConverter : JsonConverter<OrderInstrument>
     {
         public override bool CanConvert(Type typeToConvert)
         {
-            return typeof(Instrument).IsAssignableFrom(typeToConvert);
+            return typeof(OrderInstrument).IsAssignableFrom(typeToConvert);
         }
 
-        public override Instrument Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        public override OrderInstrument Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             Utf8JsonReader readerClone = reader;
 
@@ -39,15 +39,15 @@ namespace TDAmeritradeAPI
                 throw new JsonException();
             }
 
-            Instrument.AssetTypes typeDiscriminator = Enum.Parse<Instrument.AssetTypes>(readerClone.GetString()!);
-            Instrument instrument = typeDiscriminator switch
+            OrderInstrument.AssetTypes typeDiscriminator = Enum.Parse<OrderInstrument.AssetTypes>(readerClone.GetString()!);
+            OrderInstrument instrument = typeDiscriminator switch
             {
-                Instrument.AssetTypes.EQUITY => new Equity(),
-                Instrument.AssetTypes.OPTION => new Option(),
-                Instrument.AssetTypes.FIXED_INCOME => new FixedIncome(),
-                Instrument.AssetTypes.MUTUAL_FUND => new MutualFund(),
-                Instrument.AssetTypes.CASH_EQUIVALENT => new CashEquivalent(),
-                _ => new Instrument()
+                OrderInstrument.AssetTypes.EQUITY => new Equity(),
+                OrderInstrument.AssetTypes.OPTION => new Option(),
+                OrderInstrument.AssetTypes.FIXED_INCOME => new FixedIncome(),
+                OrderInstrument.AssetTypes.MUTUAL_FUND => new MutualFund(),
+                OrderInstrument.AssetTypes.CASH_EQUIVALENT => new CashEquivalent(),
+                _ => new OrderInstrument()
             };
 
             while (reader.Read())
@@ -64,7 +64,7 @@ namespace TDAmeritradeAPI
                     switch (propertyName)
                     {
                         case "assetType":
-                            instrument.AssetType = Enum.Parse<Instrument.AssetTypes>(reader.GetString()!);
+                            instrument.AssetType = Enum.Parse<OrderInstrument.AssetTypes>(reader.GetString()!);
                             break;
                         case "cusip":
                             instrument.Cusip = reader.GetString()!;
@@ -87,13 +87,13 @@ namespace TDAmeritradeAPI
                         case "type":
                             switch (typeDiscriminator)
                             {
-                                case Instrument.AssetTypes.OPTION:
+                                case OrderInstrument.AssetTypes.OPTION:
                                     ((Option)instrument).Type = Enum.Parse<Option.Enums.Type>(reader.GetString()!);
                                     break;
-                                case Instrument.AssetTypes.MUTUAL_FUND:
+                                case OrderInstrument.AssetTypes.MUTUAL_FUND:
                                     ((MutualFund)instrument).Type = Enum.Parse<MutualFund.Enums.Type>(reader.GetString()!);
                                     break;
-                                case Instrument.AssetTypes.CASH_EQUIVALENT:
+                                case OrderInstrument.AssetTypes.CASH_EQUIVALENT:
                                     ((CashEquivalent)instrument).Type = Enum.Parse<CashEquivalent.Enums.Type>(reader.GetString()!);
                                     break;
                                 default:
@@ -129,7 +129,7 @@ namespace TDAmeritradeAPI
                                         case "currencyType":
                                             optionDeliverable.CurrencyType = Enum.Parse<Option.Enums.CurrencyType>(reader.GetString()!); break;
                                         case "assetType":
-                                            optionDeliverable.AssetType = Enum.Parse<Instrument.AssetTypes>(reader.GetString()!); break;
+                                            optionDeliverable.AssetType = Enum.Parse<OrderInstrument.AssetTypes>(reader.GetString()!); break;
                                     }
                                 }
                                 if (reader.TokenType == JsonTokenType.EndObject)
@@ -146,7 +146,7 @@ namespace TDAmeritradeAPI
             return instrument;
         }
         public override void Write(
-            Utf8JsonWriter writer, Instrument instrument, JsonSerializerOptions options)
+            Utf8JsonWriter writer, OrderInstrument instrument, JsonSerializerOptions options)
         {
             writer.WriteStartObject();
 

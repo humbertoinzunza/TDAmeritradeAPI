@@ -291,8 +291,8 @@
                 Session = Order.Enums.Session.NORMAL,
                 OrderLegCollection = new List<Order.OrderLeg>()
                 {
-                    new Order.OrderLeg(instruction1, longQuantity, new Instrument(longOption.Symbol, Instrument.AssetTypes.OPTION)),
-                    new Order.OrderLeg(instruction2, shortQuantity, new Instrument(shortOption.Symbol, Instrument.AssetTypes.OPTION))
+                    new Order.OrderLeg(instruction1, longQuantity, new OrderInstrument(longOption.Symbol, OrderInstrument.AssetTypes.OPTION)),
+                    new Order.OrderLeg(instruction2, shortQuantity, new OrderInstrument(shortOption.Symbol, OrderInstrument.AssetTypes.OPTION))
                 }
             };
             return order;
@@ -335,7 +335,7 @@
             order.OrderLegCollection[0].Instruction = instruction;
             order.OrderLegCollection[0].Quantity = quantity;
             order.OrderLegCollection[0].Instrument =
-                new Instrument(symbol, securityType == Order.Enums.SecurityType.Equity ? Instrument.AssetTypes.EQUITY : Instrument.AssetTypes.OPTION);
+                new OrderInstrument(symbol, securityType == Order.Enums.SecurityType.Equity ? OrderInstrument.AssetTypes.EQUITY : OrderInstrument.AssetTypes.OPTION);
 
             return order;
         }

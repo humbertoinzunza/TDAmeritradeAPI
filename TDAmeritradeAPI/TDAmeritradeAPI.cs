@@ -11,6 +11,11 @@ using System.Web;
 using Yoh.Text.Json.NamingPolicies;
 using System.Configuration;
 using System.Text.Json.Serialization;
+using static System.Runtime.InteropServices.JavaScript.JSType;
+using System.Diagnostics.Metrics;
+using System.Reflection.PortableExecutable;
+using System.Text.RegularExpressions;
+using static TDAmeritradeAPI.Instrument.Enums;
 
 namespace TDAmeritradeAPI
 {
@@ -78,6 +83,7 @@ namespace TDAmeritradeAPI
             _oAuth2Data.SaveChanges();
         }
 
+        #region OAuth 2.0
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
          *                                  OAuth 2.0 Functions                                            *
          *                                                                                                 *
@@ -294,6 +300,10 @@ namespace TDAmeritradeAPI
             Console.WriteLine("Access token obtained successfully.\n");
         }
 
+        /// <summary>
+        /// Gets a password from the user while hiding the characters typed.
+        /// </summary>
+        /// <returns>The string containing the password entered.</returns>
         private static string GetPassword()
         {
             string pass = string.Empty;
@@ -317,6 +327,11 @@ namespace TDAmeritradeAPI
             return pass;
         }
 
+        /// <summary>
+        /// Gets a 6 digit verification code from the user. It only accepts numbers and won't accept
+        /// the Enter key unless the required length is reached.
+        /// </summary>
+        /// <returns>The 6 digit numeric code.</returns>
         private static string GetVerificationCode()
         {
             string code = string.Empty;
@@ -418,6 +433,26 @@ namespace TDAmeritradeAPI
             // Save the expiration time of the appropriate token
             _oAuth2Data.WriteTokenExpiration(token == Token.RefreshToken ? OAuth2Data.TokenType.RefreshToken :
                 OAuth2Data.TokenType.AccessToken);
+        }
+
+        /// <summary>
+        /// Creates a 
+        /// url with a URL-encoded set of key-value pairs appended in the query string.
+        /// </summary>
+        /// <param name="endpoint">The URL that the query string will be appended onto.</param>
+        /// <param name="parameters">A dictionary of key-value pairs that will be added to the query string.</param>
+        /// <returns>The full url with the query string appended.</returns>
+        private static string BuildURL(string endpoint, Dictionary<string, string> parameters)
+        {
+            string url = endpoint + '?';
+
+            foreach (KeyValuePair<string, string> parameter in parameters)
+                url += parameter.Key + "=" + HttpUtility.UrlEncode(parameter.Value) + '&';
+
+            // Remove the last & symbol
+            url = url[..^1];
+
+            return url;
         }
 
         /// <summary>
@@ -627,29 +662,12 @@ namespace TDAmeritradeAPI
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
          *                                          OAuth 2.0 End                                        *
          * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+        #endregion
 
+        #region Quotes
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
          *                                              Quotes                                           *
          * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-
-        /// <summary>
-        /// Creates an url with a URL-encoded set of key-value pairs appended in the query string.
-        /// </summary>
-        /// <param name="endpoint">The URL that the query string will be appended onto.</param>
-        /// <param name="parameters">A dictionary of key-value pairs that will be added to the query string.</param>
-        /// <returns>The full url with the query string appended.</returns>
-        private static string BuildURL(string endpoint, Dictionary<string, string> parameters)
-        {
-            string url = endpoint + '?';
-
-            foreach (KeyValuePair<string, string> parameter in parameters)
-                url += parameter.Key + "=" + HttpUtility.UrlEncode(parameter.Value) + '&';
-
-            // Remove the last & symbol
-            url = url[..^1];
-
-            return url;
-        }
 
         /// <summary>
         /// Get quote for a symbol.
@@ -767,12 +785,21 @@ namespace TDAmeritradeAPI
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
          *                                            End Quotes                                         *
          * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+        #endregion
 
+        #region Price History
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
          *                                          Price History                                        *
          * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-        public async Task<string> GetPriceHistory(string symbol, PriceHistoryOptions options)
+        /// <summary>
+        /// Get price history for a symbol.
+        /// </summary>
+        /// <param name="symbol">The symbol in question.</param>
+        /// <param name="options">A PriceHistoryOptions object that contains the options that describe the data
+        /// that is fetched.</param>
+        /// <returns>A PriceHistory object that contains the historical data.</returns>
+        public async Task<PriceHistory> GetPriceHistory(string symbol, PriceHistoryOptions options)
         {
             ParseSymbol(ref symbol);
 
@@ -781,13 +808,15 @@ namespace TDAmeritradeAPI
             // Get the PriceHistoryOptions object as a dictionary
             Dictionary<string, string> parameters = options.ToDictionary();
 
+            string response = await HttpRequest(endpoint, HttpMethod.Get, parameters, true).ConfigureAwait(false);
 
-            return await HttpRequest(endpoint, HttpMethod.Get, parameters, true).ConfigureAwait(false);
+            return JsonSerializer.Deserialize<PriceHistory>(response, _serializerOptions)!;
         }
 
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
          *                                         End Price History                                     *
          * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+        #endregion
 
         #region Watchlists
 
@@ -831,7 +860,7 @@ namespace TDAmeritradeAPI
         /// <summary>
         /// Gets a watchlist associated with a TD Ameritrade account.
         /// </summary>
-        /// <param name="accountId">Account ID associated with the watchlist.</param>
+        /// <param name="accountId">Account IDEAS associated with the watchlist.</param>
         /// <param name="watchlistId">ID of the watchlist of interest.</param>
         /// <returns>Returns the watchlist of interest in the given account.</returns>
         public async Task<List<Watchlist>> GetWatchlist(string accountId, string watchlistId)
@@ -990,6 +1019,7 @@ namespace TDAmeritradeAPI
 
         #endregion
 
+        #region Maket Hours
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
          *                                         Market Hours                                          *
          * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -1000,7 +1030,7 @@ namespace TDAmeritradeAPI
         /// <param name="markets">A list of the markets of interest.</param>
         /// <param name="date">The date of interest.</param>
         /// <returns></returns>
-        public async Task<string> MarketHours(List<CustomEnums.Markets> markets, DateTime date)
+        public async Task<Dictionary<string, Dictionary<string, MarketHours>>> MarketHours(List<MarketType> markets, DateTime date)
         {
             string endpoint;
             // Add the date to the parameters
@@ -1017,12 +1047,19 @@ namespace TDAmeritradeAPI
                 // Create the string of comma-separated markets and add it to the parameters
                 parameters["markets"] = string.Join(',', markets);
             }
-            return await HttpRequest(endpoint, HttpMethod.Get, parameters).ConfigureAwait(false);
+
+            string response = await HttpRequest(endpoint, HttpMethod.Get, parameters).ConfigureAwait(false);
+
+            Dictionary<string, Dictionary<string, MarketHours>> values = 
+                JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, MarketHours>>>(response, _serializerOptions)!;
+
+            return values;
         }
 
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
          *                                        End Market Hours                                       *
          * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+        #endregion
 
         #region User Info & Preferences
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -1433,6 +1470,73 @@ namespace TDAmeritradeAPI
 
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
          *                                        End Saved Orders                                       *
+         * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+        #endregion
+
+        #region Instruments
+        /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+         *                                          Instruments                                          *
+         * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+        /// <summary>
+        /// Get an instrument by CUSIP.
+        /// </summary>
+        /// <param name="cusip">The instrument's CUSIP.</param>
+        /// <returns>An Instrument object with the instrument's information.</returns>
+        public async Task<Instrument> GetInstrument(string cusip)
+        {
+            string endpoint = $"https://api.tdameritrade.com/v1/instruments/{cusip}";
+            string response = await HttpRequest(endpoint, HttpMethod.Get).ConfigureAwait(false);
+            List<Instrument> list = JsonSerializer.Deserialize<List<Instrument>>(response, _serializerOptions)!;
+            return list[0];
+        }
+
+        /// <summary>
+        /// Search or retrieve instrument fundamental data.
+        /// </summary>
+        /// <param name="symbol">The symbol in question.</param>
+        /// <returns>A FundamentalData object containing the fundamental data of the instrument.</returns>
+        public async Task<FundamentalData> GetFundamentalData(string symbol)
+        {
+            Dictionary<string, string> parameters = new()
+            {
+                { "symbol", symbol },
+                { "projection", "fundamental" }
+            };
+            string endpoint = "https://api.tdameritrade.com/v1/instruments";
+            string response = await HttpRequest(endpoint, HttpMethod.Get, parameters).ConfigureAwait(false);
+            Dictionary<string, FundamentalData> fd = JsonSerializer.Deserialize<Dictionary<string, FundamentalData>>(response, _serializerOptions)!;
+            return fd[symbol];
+        }
+
+        /// <summary>
+        /// Search or retrieve instrument data.
+        /// </summary>
+        /// <param name="symbol">The symbol in question.</param>
+        /// <param name="searchType">The type of search done with the symbol value.</param>
+        /// <returns>A dictionary for which the keys are the CUSIPs or the symbols of the matches found.</returns>
+        /// <remarks>
+        /// The type of request:
+        /// SYMBOL_SEARCH: Retrieve instrument data of a specific symbol or cusip
+        /// SYMBOL_REGEX: Retrieve instrument data for all symbols matching regex.Example: symbol= XYZ.* will return all symbols beginning with XYZ
+        /// DESC_SEARCH: Retrieve instrument data for instruments whose description contains the word supplied.Example: symbol= FakeCompany will
+        /// return all instruments with FakeCompany in the description.
+        /// DESC_REGEX: Search description with full regex support. Example: symbol= XYZ.[A - C] returns all instruments whose descriptions contain
+        /// a word beginning with XYZ followed by a character A through C.
+        /// </remarks>
+        public async Task<Dictionary<string, Instrument>> SearchInstruments(string symbol, Instrument.Enums.SearchType searchType)
+        {
+            Dictionary<string, string> parameters = new()
+            {
+                { "symbol", symbol },
+                { "projection", searchType.ToString().ToLower().Replace('_', '-') }
+            };
+            string endpoint = "https://api.tdameritrade.com/v1/instruments";
+            string response = await HttpRequest(endpoint, HttpMethod.Get, parameters).ConfigureAwait(false);
+            return JsonSerializer.Deserialize<Dictionary<string, Instrument>>(response, _serializerOptions)!;
+        }
+        /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+         *                                        End Instruments                                        *
          * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
         #endregion
 

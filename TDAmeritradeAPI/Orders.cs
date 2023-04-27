@@ -72,13 +72,13 @@ namespace TDAmeritradeAPI
         public class OrderLeg
         {
             public OrderLeg() { }
-            public OrderLeg(Enums.Instruction instruction, double quantity, Instrument instrument)
+            public OrderLeg(Enums.Instruction instruction, double quantity, OrderInstrument instrument)
             {
                 Instruction = instruction;
                 Quantity = quantity;
                 Instrument = instrument;
             }
-            public OrderLeg(Enums.OrderLegType? orderLegType, long? legId, Instrument? instrument, Enums.Instruction? instruction,
+            public OrderLeg(Enums.OrderLegType? orderLegType, long? legId, OrderInstrument? instrument, Enums.Instruction? instruction,
                 Enums.PositionEffect? positionEffect, double? quantity, Enums.QuantityType? quantityType)
             {
                 OrderLegType = orderLegType;
@@ -92,7 +92,7 @@ namespace TDAmeritradeAPI
 
             public Enums.OrderLegType? OrderLegType { get; set; }
             public long? LegId { get; set; }
-            public Instrument? Instrument { get; set; }
+            public OrderInstrument? Instrument { get; set; }
             public Enums.Instruction? Instruction { get; set; }
             public Enums.PositionEffect? PositionEffect { get; set; }
             public double? Quantity { get; set; }
@@ -206,14 +206,14 @@ namespace TDAmeritradeAPI
         public double? OrderRemainingQuantity { get; set; }
         public List<Structs.ExecutionLeg>? ExecutionLegs { get; set; }
     }
-    public class Instrument
+    public class OrderInstrument
     {
         // Enums
         public enum AssetTypes { EQUITY, OPTION, INDEX, MUTUAL_FUND, CASH_EQUIVALENT, FIXED_INCOME, CURRENCY }
 
         // Properties
-        public Instrument() { }
-        public Instrument(string? symbol, AssetTypes? assetType)
+        public OrderInstrument() { }
+        public OrderInstrument(string? symbol, AssetTypes? assetType)
         {
             Symbol = symbol;
             AssetType = assetType;
@@ -224,9 +224,9 @@ namespace TDAmeritradeAPI
         public string? Description { get; set; }
     }
 
-    public class Equity : Instrument { }
+    public class Equity : OrderInstrument { }
 
-    public class FixedIncome : Instrument
+    public class FixedIncome : OrderInstrument
     {
         // Properties
         public string? MaturityDate { get; set; }
@@ -234,7 +234,7 @@ namespace TDAmeritradeAPI
         public double? Factor { get; set; }
     }
 
-    public class MutualFund : Instrument
+    public class MutualFund : OrderInstrument
     {
         public class Enums
         {
@@ -244,7 +244,7 @@ namespace TDAmeritradeAPI
         public Enums.Type? Type { get; set; }
     }
 
-    public class CashEquivalent : Instrument
+    public class CashEquivalent : OrderInstrument
     {
         public class Enums
         {
@@ -254,7 +254,7 @@ namespace TDAmeritradeAPI
         public Enums.Type? Type { get; set; }
     }
 
-    public class Option : Instrument
+    public class Option : OrderInstrument
     {
         // Enums
         public class Enums

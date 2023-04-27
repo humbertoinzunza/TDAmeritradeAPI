@@ -1,5 +1,23 @@
-﻿namespace TDAmeritradeAPI
+﻿
+namespace TDAmeritradeAPI
 {
+    public class PriceHistory
+    {
+        public List<Candle>? Candles { get; set; }
+        public bool? Empty { get; set; }
+        public string? Symbol { get; set; }
+    }
+
+    public struct Candle
+    {
+        public double Close { get; set; }
+        public long Datetime { get; set; }
+        public double High { get; set; }
+        public double Low { get; set; }
+        public double Open { get; set; }
+        public long Volume { get; set; }
+    }
+
     /// <summary>
     /// Class that represents the options available for the enpoint
     /// https://api.tdameritrade.com/v1/marketdata/{symbol}/pricehistory.

@@ -18,7 +18,7 @@
                 public double? SettledLongQuantity { get; set; }
                 public double? SettledShortQuantity { get; set; }
                 public double? AgedQuantity { get; set; }
-                public Instrument? Instrument { get; set; }
+                public OrderInstrument? Instrument { get; set; }
                 public double? MarketValue { get; set; }
             }
             public struct Balance

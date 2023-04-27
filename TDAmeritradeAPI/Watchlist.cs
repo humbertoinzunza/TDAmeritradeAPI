@@ -48,16 +48,16 @@ namespace TDAmeritradeAPI
     public class WatchlistItem
     {
         public WatchlistItem() { }
-        public WatchlistItem(string symbol, Instrument.AssetTypes assetType)
+        public WatchlistItem(string symbol, OrderInstrument.AssetTypes assetType)
         {
-            Instrument = new Instrument(symbol, assetType);
+            Instrument = new OrderInstrument(symbol, assetType);
         }
         public int? SequenceId { get; set; }
         public double? Quantity { get; set; }
         public double? AveragePrice { get; set; }
         public double? Commission { get; set; }
         public string? Date { get; set; }
-        public Instrument? Instrument { get; set; }
+        public OrderInstrument? Instrument { get; set; }
         public Watchlist.Enums.Status? Status { get; set; }
     }
 }

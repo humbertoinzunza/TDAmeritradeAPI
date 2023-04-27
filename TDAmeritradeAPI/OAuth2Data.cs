@@ -66,7 +66,7 @@ namespace TDAmeritradeAPI
             string data = AsJson();
             string authFilePath = ConfigurationManager.AppSettings["AuthorizationFile"]!;
             using StreamWriter sw = new(authFilePath, false);
-            sw.WriteAsync(data);
+            sw.Write(data);
         }
 
         /// <summary>

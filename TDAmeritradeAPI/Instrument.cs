@@ -4,8 +4,8 @@
     {
         public class Enums
         {
-            public enum AssetType { EQUITY, ETF, FOREX, FUTURE, FUTURE_OPTION, INDEX, INDICATOR, MUTUAL_FUND, OPTION, UNKNOWN }
-            public enum SearchType { SYMBOL_SEARCH, SYMBOL_REGEX, DESC_SEARCH, DESC_REGEX };
+            public enum AssetType : byte { EQUITY, ETF, FOREX, FUTURE, FUTURE_OPTION, INDEX, INDICATOR, MUTUAL_FUND, OPTION, UNKNOWN }
+            public enum SearchType : byte { SYMBOL_SEARCH, SYMBOL_REGEX, DESC_SEARCH, DESC_REGEX };
         }
         public string? Cusip { get; set; }
         public string? Symbol { get; set; }

@@ -11,11 +11,7 @@ using System.Web;
 using Yoh.Text.Json.NamingPolicies;
 using System.Configuration;
 using System.Text.Json.Serialization;
-using static System.Runtime.InteropServices.JavaScript.JSType;
-using System.Diagnostics.Metrics;
-using System.Reflection.PortableExecutable;
-using System.Text.RegularExpressions;
-using static TDAmeritradeAPI.Instrument.Enums;
+using System.Globalization;
 
 namespace TDAmeritradeAPI
 {
@@ -36,7 +32,7 @@ namespace TDAmeritradeAPI
                 DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
                 PropertyNameCaseInsensitive = true
             };
-            // Read the file paths for the OAuth2.0 data
+            // Read the file path for the OAuth2.0 data
             // Tell the compiler to ignore possible null assignment
             string authFilePath = ConfigurationManager.AppSettings["AuthorizationFile"]!;
             // If the strings are in fact null throw an exception
@@ -75,7 +71,7 @@ namespace TDAmeritradeAPI
             }
             else
             {
-                // Take care of the epiration dates of the tokens
+                // Take care of the expiration dates of the tokens
                 await RefreshTokens().ConfigureAwait(false);
             }
 
@@ -139,7 +135,7 @@ namespace TDAmeritradeAPI
             ChromeDriverService service = ChromeDriverService.CreateDefaultService("chromedriver.exe");
             service.SuppressInitialDiagnosticInformation = true;
 
-            // Instantiate a Chromedriver object and set the directory path of the driver
+            // Instantiate a Chromedriver object and set the directory path of the driver InvalidOperationException when Chrome version is not up to date
             ChromeDriver chromedriver = new(service, options);
 
             // Set the current URL to the Auth URL
@@ -227,7 +223,7 @@ namespace TDAmeritradeAPI
             } while(failedLogin);
             // Click Continue (again)
             chromedriver.FindElement(By.Id("accept")).Click();
-            // Read the phone number the code is going to be sent
+            // Read the phone number the code is going to be sent to
             IWebElement tempElement = chromedriver.FindElement(By.XPath("//*[@id=\"authform\"]/main/div[2]/p[2]/strong"));
             string phoneNumber = tempElement.Text;
             // Enter the SMS code sent
@@ -237,7 +233,7 @@ namespace TDAmeritradeAPI
             chromedriver.FindElement(By.Id("smscode0")).SendKeys(tempEntry);
             // Click Continue
             chromedriver.FindElement(By.Id("accept")).Click();
-            // If there was an error logging in, ask the user for verification code again
+            // If there was an error logging in, ask the user for the verification code again
             failedLogin = true;
             do
             {
@@ -271,7 +267,7 @@ namespace TDAmeritradeAPI
             webDriverWait = new(chromedriver, TimeSpan.FromSeconds(15));
             webDriverWait.Until(x => x.Url.Contains("code="));
 
-            // Get the authorization code (everything after the 'code=' in the URL
+            // Get the authorization code (everything after the 'code=' in the URL)
             string authorizationCode = chromedriver.Url[(chromedriver.Url.IndexOf("code=") + 5)..];
 
             // Decode the authorization code
@@ -860,7 +856,7 @@ namespace TDAmeritradeAPI
         /// <summary>
         /// Gets a watchlist associated with a TD Ameritrade account.
         /// </summary>
-        /// <param name="accountId">Account IDEAS associated with the watchlist.</param>
+        /// <param name="accountId">Account ID associated with the watchlist.</param>
         /// <param name="watchlistId">ID of the watchlist of interest.</param>
         /// <returns>Returns the watchlist of interest in the given account.</returns>
         public async Task<List<Watchlist>> GetWatchlist(string accountId, string watchlistId)
@@ -920,8 +916,8 @@ namespace TDAmeritradeAPI
         /// <returns>Void.</returns>
         /// <remarks>It is best to use this function by first obtaining the watchlist to modify, deserializing it into a
         /// Watchlist object, modifying the desired attributes, and serializing it back into a JSON string.
-        /// To deserialize use either AsJson(), NameAsJson(), or ItemsAsJson() depending wether both the name and the
-        /// items were changed, only the name was changed, or only the items were change. Pass the JSON string returned
+        /// To deserialize use either AsJson(), NameAsJson(), or ItemsAsJson() depending whether both the name and the
+        /// items were changed, only the name was changed, or only the items were changed. Pass the JSON string returned
         /// by these functions as the modifiedWatchlistJson.</remarks>
         public async Task UpdateWatchlist(string accountId, string watchlistId, string modifiedWatchlistJson)
         {
@@ -1540,5 +1536,90 @@ namespace TDAmeritradeAPI
          * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
         #endregion
 
+        #region Movers
+        /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+         *                                             Movers                                            *
+         * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+        /// <summary>
+        /// Top 10 (up or down) movers by value or percent for a particular market
+        /// </summary>
+        /// <param name="validIndex">An enum to select one of the three valid stock indices for the request.</param>
+        /// <param name="direction">Determines whether the movers moved up or down.</param>
+        /// <param name="changeType">Indicates whether the change is in percentage or value.</param>
+        /// <returns>An array containing the movers.</returns>
+        public async Task<Mover[]> GetMovers(Mover.Enums.ValidIndex validIndex, Mover.Enums.Direction direction, Mover.Enums.ChangeType changeType)
+        {
+            string symbol = validIndex == Mover.Enums.ValidIndex.SP500 ? "$SPX.X" : validIndex == Mover.Enums.ValidIndex.NASDAQ_COMPOSITE ? "$COMPX" : "$DJI";
+            Dictionary<string, string> parameters = new()
+            {
+                {"direction", direction.ToString().ToLower() },
+                { "change", changeType.ToString().ToLower() }
+            };
+            string endpoint = $"https://api.tdameritrade.com/v1/marketdata/{symbol}/movers";
+            string response = await HttpRequest(endpoint, HttpMethod.Get, parameters).ConfigureAwait(false);
+            return JsonSerializer.Deserialize<Mover[]>(response, _serializerOptions)!;
+        }
+
+        /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+         *                                          End Movers                                           *
+         * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+        #endregion
+
+        #region Transactions
+        /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+         *                                          Transactions                                         *
+         * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+        /// <summary>
+        /// Transactions for a specific account.
+        /// </summary>
+        /// <param name="accountId"></param>
+        /// <param name="startDate"></param>
+        /// <param name="endDate"></param>
+        /// <param name="searchType"></param>
+        /// <param name="symbol"></param>
+        /// <returns></returns>
+        public async Task<string> GetTransactions(string accountId, DateOnly startDate, DateOnly endDate,
+            Transaction.Enums.SearchType searchType = Transaction.Enums.SearchType.ALL, string? symbol = null)
+        {
+            Dictionary<string, string> parameters = new()
+            {
+                { "type", searchType.ToString() },
+                { "startDate", startDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) },
+                { "endDate", endDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) }
+            };
+            if (symbol != null) parameters.Add("symbol", symbol);
+
+            string endpoint = $"https://api.tdameritrade.com/v1/accounts/{accountId}/transactions";
+
+            return await HttpRequest(endpoint, HttpMethod.Get, parameters).ConfigureAwait(false);
+        }
+
+        /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+         *                                        End Transactions                                       *
+         * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+        #endregion
+
+        #region Option Chains
+        /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+         *                                         Option Chains                                         *
+         * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+        /// <summary>
+        /// Get option chain for an optionable symbol.
+        /// </summary>
+        /// <param name="options">An OptionChainSearchOptions object with the options required for the search.</param>
+        /// <returns>An OptionChain object representing the option chain.</returns>
+        public async Task<OptionChain> GetOptionChain(OptionChainSearchOptions options)
+        {
+            string endpoint = "https://api.tdameritrade.com/v1/marketdata/chains";
+            string result = await HttpRequest(endpoint, HttpMethod.Get, options.ToDictionary()).ConfigureAwait(false);
+            return JsonSerializer.Deserialize<OptionChain>(result, _serializerOptions)!;
+        }
+        /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+         *                                       End Option Chains                                       *
+         * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+        #endregion
     }
 }

@@ -26,16 +26,16 @@ namespace TDAmeritradeAPI
         /// </summary>
         /// <param name="name">Name of the watchlist.</param>
         /// <param name="itemList">List watchlist items.</param>
-        public Watchlist(string name, List<WatchlistItem> itemList) : this()
+        public Watchlist(string name, WatchlistItem[] itemList) : this()
         {
             Name = name;
-            WatchlistItems = itemList;
+            WatchlistItems = (WatchlistItem[])itemList.Clone();
         }
 
         public string? Name { get; set; }
         public string? WatchlistId { get; set; }
         public Enums.Status? Status { get; set; }
-        public List<WatchlistItem>? WatchlistItems { get; set; }
+        public WatchlistItem[]? WatchlistItems { get; set; }
         public string AsJson()
         {
             return JsonSerializer.Serialize(this, _serializerOptions);

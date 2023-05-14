@@ -1,10 +1,10 @@
 ﻿using System.Text.Json;
-using System.Configuration;
 
 namespace TDAmeritradeAPI
 {
     public class OAuth2Data
     {
+        private const string authFilePath = "oa2d.json";
         /// <summary>
         /// Enumarates the types of tokens used in the TD Ameritrade API class used in the WriteTokenExpiration function.
         /// </summary>
@@ -64,7 +64,6 @@ namespace TDAmeritradeAPI
         {
             // Serialize this object into a JSON string
             string data = AsJson();
-            string authFilePath = ConfigurationManager.AppSettings["AuthorizationFile"]!;
             using StreamWriter sw = new(authFilePath, false);
             sw.Write(data);
         }

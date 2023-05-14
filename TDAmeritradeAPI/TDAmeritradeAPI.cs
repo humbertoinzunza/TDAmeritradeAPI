@@ -9,7 +9,6 @@ using System.Runtime.InteropServices;
 using System.Timers;
 using System.Web;
 using Yoh.Text.Json.NamingPolicies;
-using System.Configuration;
 using System.Text.Json.Serialization;
 using System.Globalization;
 
@@ -17,6 +16,7 @@ namespace TDAmeritradeAPI
 {
     public class Client
     {
+        private const string authFilePath = "oa2d.json";
         private bool _firstTimer = true;
         private System.Timers.Timer? _refreshTokenTimer = null;
         private readonly HttpClient _httpClient = new();
@@ -34,10 +34,7 @@ namespace TDAmeritradeAPI
             };
             // Read the file path for the OAuth2.0 data
             // Tell the compiler to ignore possible null assignment
-            string authFilePath = ConfigurationManager.AppSettings["AuthorizationFile"]!;
             // If the strings are in fact null throw an exception
-            if (authFilePath == null)
-                throw new NullReferenceException("Error. Unable to read from configuration file.\n\n");
             try
             {
                 using StreamReader sr = new(authFilePath);
@@ -50,11 +47,6 @@ namespace TDAmeritradeAPI
             catch (FileNotFoundException)
             {
                 Console.WriteLine($"Error. The attempt to read the authorization file failed.\n\n");
-                _oAuth2Data = new OAuth2Data();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error. The attempt to read the authorization file failed.\n\n{ex.Message}");
                 _oAuth2Data = new OAuth2Data();
             }
         }
@@ -136,7 +128,17 @@ namespace TDAmeritradeAPI
             service.SuppressInitialDiagnosticInformation = true;
 
             // Instantiate a Chromedriver object and set the directory path of the driver InvalidOperationException when Chrome version is not up to date
-            ChromeDriver chromedriver = new(service, options);
+            ChromeDriver chromedriver;
+            try
+            {
+                chromedriver = new(service, options);
+            }
+            catch (WebDriverException)
+            {
+                Console.WriteLine("Error. Google Chrome not found. You must download the latest" +
+                    " version of Google Chrome for the WebDriver to work.");
+                throw;
+            }
 
             // Set the current URL to the Auth URL
             chromedriver.Navigate().GoToUrl(authURL);
@@ -704,8 +706,7 @@ namespace TDAmeritradeAPI
 
             string response = await HttpRequest(endpoint, HttpMethod.Get, parameters, true).ConfigureAwait(false);
 
-            if (assetType is null)
-                assetType = Quote.GetAssetType(response);
+            assetType ??= Quote.GetAssetType(response);
 
             if (assetType == Instrument.Enums.AssetType.EQUITY || assetType == Instrument.Enums.AssetType.ETF)
             {
@@ -877,7 +878,7 @@ namespace TDAmeritradeAPI
         /// <param name="watchlistName">The name of the watchlist.</param>
         /// <param name="symbols">List of key-value pairs where the key is the symbol and the value is its asset type.</param>
         /// <returns></returns>
-        public async Task CreateWatchlist(string accountId, string watchlistName, List<WatchlistItem> symbols)
+        public async Task CreateWatchlist(string accountId, string watchlistName, WatchlistItem[] symbols)
         {
             string endpoint = $"https://api.tdameritrade.com/v1/accounts/{accountId}/watchlists";
 
@@ -909,26 +910,26 @@ namespace TDAmeritradeAPI
         /// <param name="accountId">Account ID associated with the watchlist.</param>
         /// <param name="watchlistId">ID of the watchlist of interest.</param>
         /// <returns>Returns the watchlist of interest in the given account.</returns>
-        public async Task<List<Watchlist>> GetWatchlist(string accountId, string watchlistId)
+        public async Task<Watchlist[]> GetWatchlist(string accountId, string watchlistId)
         {
             string endpoint = $"https://api.tdameritrade.com/v1/accounts/{accountId}/watchlists/{watchlistId}";
 
             string watchlists = await HttpRequest(endpoint, HttpMethod.Get).ConfigureAwait(false);
 
-            return JsonSerializer.Deserialize<List<Watchlist>>(watchlists, _serializerOptions)!;
+            return JsonSerializer.Deserialize < Watchlist[]>(watchlists, _serializerOptions)!;
         }
 
         /// <summary>
         /// Gets all the watchlists of all the linked accounts.
         /// </summary>
         /// <returns>Returns all watchlists from all the linked accounts.</returns>
-        public async Task<List<Watchlist>> GetWatchlistsForMultipleAccounts()
+        public async Task<Watchlist[]> GetWatchlistsForMultipleAccounts()
         {
             string endpoint = $"https://api.tdameritrade.com/v1/accounts/watchlists";
 
             string watchlists = await HttpRequest(endpoint, HttpMethod.Get).ConfigureAwait(false);
 
-            return JsonSerializer.Deserialize<List<Watchlist>>(watchlists, _serializerOptions)!;
+            return JsonSerializer.Deserialize<Watchlist[]>(watchlists, _serializerOptions)!;
         }
 
         /// <summary>
@@ -936,17 +937,17 @@ namespace TDAmeritradeAPI
         /// </summary>
         /// <param name="accountId">Account ID associated with the watchlists.</param>
         /// <returns>Returns all watchlists of the given account.</returns>
-        public async Task<List<Watchlist>> GetWatchlistsForSingleAccount(string accountId)
+        public async Task<Watchlist[]> GetWatchlistsForSingleAccount(string accountId)
         {
             string endpoint = $"https://api.tdameritrade.com/v1/accounts/{accountId}/watchlists";
 
             string watchlists = await HttpRequest(endpoint, HttpMethod.Get).ConfigureAwait(false);
 
-            return JsonSerializer.Deserialize<List<Watchlist>>(watchlists, _serializerOptions)!;
+            return JsonSerializer.Deserialize<Watchlist[]>(watchlists, _serializerOptions)!;
         }
 
         public async Task ReplaceWatchlist(string accountId, string watchlistId, string watchlistName,
-            List<WatchlistItem> symbols)
+            WatchlistItem[] symbols)
         {
             string endpoint = $"https://api.tdameritrade.com/v1/accounts/{accountId}/watchlists/{watchlistId}";
 
@@ -984,6 +985,7 @@ namespace TDAmeritradeAPI
          * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
         #endregion
 
+        // Check
         #region Accounts
 
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -1063,7 +1065,7 @@ namespace TDAmeritradeAPI
          *                                          End Accounts                                         *
          * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-        #endregion
+        #endregion//
 
         #region Maket Hours
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -1107,6 +1109,7 @@ namespace TDAmeritradeAPI
          * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
         #endregion
 
+        // Check
         #region User Info & Preferences
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
          *                                     User Info & Preferences                                   *
@@ -1203,7 +1206,7 @@ namespace TDAmeritradeAPI
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
          *                                  End User Info & Preferences                                  *
          * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-        #endregion
+        #endregion//
 
         #region Orders
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -1489,13 +1492,13 @@ namespace TDAmeritradeAPI
         /// <param name="accountId">The account's ID.</param>
         /// <param name="savedOrderId">The saved order's ID.</param>
         /// <returns>A list of Order objects.</returns>
-        public async Task<List<Order>> GetSavedOrdersByPath(string accountId, string savedOrderId)
+        public async Task<Order[]> GetSavedOrdersByPath(string accountId, string savedOrderId)
         {
             string endpoint = $"https://api.tdameritrade.com/v1/accounts/{accountId}/savedorders/{savedOrderId}";
 
             string jsonOrder = await HttpRequest(endpoint, HttpMethod.Get).ConfigureAwait(false);
 
-            return JsonSerializer.Deserialize<List<Order>>(jsonOrder, _serializerOptions)!;
+            return JsonSerializer.Deserialize<Order[]>(jsonOrder, _serializerOptions)!;
         }
 
         /// <summary>
@@ -1616,6 +1619,7 @@ namespace TDAmeritradeAPI
          * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
         #endregion
 
+        // Check
         #region Transactions
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
          *                                          Transactions                                         *

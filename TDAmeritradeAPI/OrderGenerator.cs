@@ -146,9 +146,26 @@
         /// <param name="expectedType">The expected security type of the symbol.</param>
         private static void ValidateSymbol(ref string symbol, Order.Enums.SecurityType expectedType)
         {
-            Order.Enums.SecurityType symbolType = Client.ParseSymbol(ref symbol);
+            Order.Enums.SecurityType symbolType = GetSecurityType(symbol);
             if (symbolType != expectedType)
                 throw new ArgumentException("Error. The symbol passed is not valid for this type of order.");
+        }
+        
+        /// <summary>
+        /// Verifies what kind of security the symbol belongs to (Equity, Option, or Other).
+        /// </summary>
+        /// <param name="symbol">The security's symbol.</param>
+        /// <returns>The type of security of the symbol.</returns>
+        /// <remarks>This function cannot differentiate between equities and mutual funds.</remarks>
+        private static Order.Enums.SecurityType GetSecurityType(string symbol)
+        {
+            foreach(char letter in symbol)
+            {
+                if (letter == '_') return Order.Enums.SecurityType.Option;
+                else if (letter == '.' || letter == '/' || letter == '$')
+                    return Order.Enums.SecurityType.Other;
+            }
+            return Order.Enums.SecurityType.Equity;
         }
 
         /// <summary>

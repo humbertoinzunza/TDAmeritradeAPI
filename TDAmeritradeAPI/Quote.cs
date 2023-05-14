@@ -12,6 +12,23 @@ namespace TDAmeritradeAPI
         public long? TradeTimeInLong { get; set; }
         public bool? Delayed { get; set; }
         public bool? RealtimeEntitled { get; set; }
+
+        public static Instrument.Enums.AssetType GetAssetType(string jsonQuote)
+        {
+            // Look for the 'assetMainType' property in the JSON string
+            int startIndex = jsonQuote.IndexOf("assetMainType");
+            // If 'assetMainType' was not found return UNKNOWN asset type
+            if (startIndex == -1) return Instrument.Enums.AssetType.UNKNOWN;
+            // Skip the 'assetMainType' part
+            startIndex += 13;
+            // Skip non-letter characters
+            while (!char.IsLetter(jsonQuote[startIndex])) startIndex++;
+            int endIndex = startIndex;
+            // Find the end of the 'assetMainType' value
+            while (jsonQuote[endIndex] != '"') endIndex++;
+            // Parse the value to enum and return it
+            return Enum.Parse<Instrument.Enums.AssetType>(jsonQuote[startIndex..endIndex], true);
+        }
     }
 
     public class MutualFundQuote : Quote

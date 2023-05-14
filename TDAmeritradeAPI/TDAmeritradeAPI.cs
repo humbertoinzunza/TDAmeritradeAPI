@@ -665,6 +665,10 @@ namespace TDAmeritradeAPI
          *                                              Quotes                                           *
          * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+        /*
+         * Removed since the GetQuotes API only gets the quote for the first symbol in the list, so it
+         * basically functions as the GetQuote is supposed to, but without character restrictions.
+         * 
         /// <summary>
         /// Get quote for a symbol.
         /// </summary>
@@ -676,33 +680,80 @@ namespace TDAmeritradeAPI
         /// function instead.</remarks>
         public async Task<string> GetQuote(string symbol)
         {
-            ParseSymbol(ref symbol);
-
             string endpoint = $"https://api.tdameritrade.com/v1/marketdata/{symbol}/quotes";
 
             return await HttpRequest(endpoint, HttpMethod.Get).ConfigureAwait(false);
         }
+        */
 
         /// <summary>
         /// Get quote for one or more symbols.
         /// </summary>
-        /// <param name="symbols">Comma-separated list of symbols.</param>
-        /// <returns>A string with the quote data of the symbols.</returns>
-        /// <remarks>Visit https://www.wintick.com/members/symbolGuide/tda to see the symbols a few
-        /// common indices. The format for futures options is still unknown.
-        /// </remarks>
-        public async Task<string> GetQuotes(string symbols)
+        /// <param name="symbol">The symbol in question.</param>
+        /// <param name="assetType">The type of security being quoted. If it's null, the function will figure out the
+        /// type, but it will take extra processing.</param>
+        /// <returns>A string with the quote data of the symbol.</returns>
+        public async Task<Dictionary<string, Quote>?> GetQuote(string symbol, Instrument.Enums.AssetType? assetType = null)
         {
             string endpoint = "https://api.tdameritrade.com/v1/marketdata/quotes";
 
             Dictionary<string, string> parameters = new()
             {
-                { "symbol", ParseSymbols(symbols) }
+                { "symbol", symbol }
             };
 
-            return await HttpRequest(endpoint, HttpMethod.Get, parameters, true).ConfigureAwait(false);
+            string response = await HttpRequest(endpoint, HttpMethod.Get, parameters, true).ConfigureAwait(false);
+
+            if (assetType is null)
+                assetType = Quote.GetAssetType(response);
+
+            if (assetType == Instrument.Enums.AssetType.EQUITY || assetType == Instrument.Enums.AssetType.ETF)
+            {
+                Dictionary<string, EquityQuote> temp =
+                        JsonSerializer.Deserialize<Dictionary<string, EquityQuote>>(response, _serializerOptions)!;
+                return temp.ToDictionary(k => k.Key, k => (Quote)k.Value);
+            }
+            else if (assetType == Instrument.Enums.AssetType.OPTION)
+            {
+                Dictionary<string, OptionQuote> temp =
+                        JsonSerializer.Deserialize<Dictionary<string, OptionQuote>>(response, _serializerOptions)!;
+                return temp.ToDictionary(k => k.Key, k => (Quote)k.Value);
+            }
+            else if (assetType == Instrument.Enums.AssetType.FUTURE)
+            {
+                Dictionary<string, FutureQuote> temp =
+                        JsonSerializer.Deserialize<Dictionary<string, FutureQuote>>(response, _serializerOptions)!;
+                return temp.ToDictionary(k => k.Key, k => (Quote)k.Value);
+            }
+            else if (assetType == Instrument.Enums.AssetType.FUTURE_OPTION)
+            {
+                Dictionary<string, FutureOptionQuote> temp =
+                        JsonSerializer.Deserialize<Dictionary<string, FutureOptionQuote>>(response, _serializerOptions)!;
+                return temp.ToDictionary(k => k.Key, k => (Quote)k.Value);
+            }
+            else if (assetType == Instrument.Enums.AssetType.FOREX)
+            {
+                Dictionary<string, ForexQuote> temp =
+                        JsonSerializer.Deserialize<Dictionary<string, ForexQuote>>(response, _serializerOptions)!;
+                return temp.ToDictionary(k => k.Key, k => (Quote)k.Value);
+            }
+            else if (assetType == Instrument.Enums.AssetType.INDEX)
+            {
+                Dictionary<string, IndexQuote> temp =
+                        JsonSerializer.Deserialize<Dictionary<string, IndexQuote>>(response, _serializerOptions)!;
+                return temp.ToDictionary(k => k.Key, k => (Quote)k.Value);
+            }
+            else if (assetType == Instrument.Enums.AssetType.MUTUAL_FUND)
+            {
+                Dictionary<string, MutualFundQuote> temp =
+                        JsonSerializer.Deserialize<Dictionary<string, MutualFundQuote>>(response, _serializerOptions)!;
+                return temp.ToDictionary(k => k.Key, k => (Quote)k.Value);
+            }
+            else
+                return null;
         }
 
+        /*
         /// <summary>
         /// Parses a symbol into the format required by the TD Ameritrade API.
         /// </summary>
@@ -777,6 +828,7 @@ namespace TDAmeritradeAPI
             // Return the list of comma-separated symbols
             return string.Join(',', symbolsArray);
         }
+        */
 
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
          *                                            End Quotes                                         *
@@ -797,8 +849,6 @@ namespace TDAmeritradeAPI
         /// <returns>A PriceHistory object that contains the historical data.</returns>
         public async Task<PriceHistory> GetPriceHistory(string symbol, PriceHistoryOptions options)
         {
-            ParseSymbol(ref symbol);
-
             string endpoint = $"https://api.tdameritrade.com/v1/marketdata/{symbol}/pricehistory";
 
             // Get the PriceHistoryOptions object as a dictionary

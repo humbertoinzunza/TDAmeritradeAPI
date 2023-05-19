@@ -1619,7 +1619,6 @@ namespace TDAmeritradeAPI
          * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
         #endregion
 
-        // Check
         #region Transactions
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
          *                                          Transactions                                         *
@@ -1628,26 +1627,28 @@ namespace TDAmeritradeAPI
         /// <summary>
         /// Transactions for a specific account.
         /// </summary>
-        /// <param name="accountId"></param>
-        /// <param name="startDate"></param>
-        /// <param name="endDate"></param>
-        /// <param name="searchType"></param>
-        /// <param name="symbol"></param>
-        /// <returns></returns>
-        public async Task<string> GetTransactions(string accountId, DateOnly startDate, DateOnly endDate,
+        /// <param name="accountId">The account's ID.</param>
+        /// <param name="startDate">Only transactions complete after this date will be returned.</param>
+        /// <param name="endDate">Only transactions complete before this date will be returned.</param>
+        /// <param name="searchType">The type of search to be performed.</param>
+        /// <param name="symbol">Only transactions involving this symbol will be returned.</param>
+        /// <returns>An array of transactions.</returns>
+        public async Task<Transaction[]> GetTransactions(string accountId, DateOnly? startDate = null, DateOnly? endDate = null,
             Transaction.Enums.SearchType searchType = Transaction.Enums.SearchType.ALL, string? symbol = null)
         {
             Dictionary<string, string> parameters = new()
             {
-                { "type", searchType.ToString() },
-                { "startDate", startDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) },
-                { "endDate", endDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) }
+                { "type", searchType.ToString() }
             };
+            if (startDate != null) parameters.Add("startDate", startDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+            if (endDate != null) parameters.Add("endDate", endDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
             if (symbol != null) parameters.Add("symbol", symbol);
 
             string endpoint = $"https://api.tdameritrade.com/v1/accounts/{accountId}/transactions";
 
-            return await HttpRequest(endpoint, HttpMethod.Get, parameters).ConfigureAwait(false);
+            string response = await HttpRequest(endpoint, HttpMethod.Get, parameters).ConfigureAwait(false);
+
+            return JsonSerializer.Deserialize<Transaction[]>(response, _serializerOptions)!;
         }
 
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *

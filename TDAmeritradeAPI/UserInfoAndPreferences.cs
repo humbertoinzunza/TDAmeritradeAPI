@@ -21,62 +21,60 @@ namespace TDAmeritradeAPI
     {
         public class Enums
         {
-            public enum OptionTradingLevel { COVERED, FULL, LONG, SPREAD, NONE }
+            public enum OptionTradingLevel : byte { COVERED, FULL, LONG, SPREAD, NONE }
         }
-        public bool Apex { get; set; }
-        public bool LevelTwoQuotes { get; set; }
-        public bool StockTrading { get; set; }
-        public bool MarginTrading { get; set; }
-        public bool StreamingNews { get; set; }
-        public Enums.OptionTradingLevel OptionTradingLevel { get; set; }
-        public bool StreamerAccess { get; set; }
-        public bool AdvancedMargin { get; set; }
-        public bool ScottradeAccount { get; set; }
+        public bool? Apex { get; set; }
+        public bool? LevelTwoQuotes { get; set; }
+        public bool? StockTrading { get; set; }
+        public bool? MarginTrading { get; set; }
+        public bool? StreamingNews { get; set; }
+        public Enums.OptionTradingLevel? OptionTradingLevel { get; set; }
+        public bool? StreamerAccess { get; set; }
+        public bool? AdvancedMargin { get; set; }
+        public bool? ScottradeAccount { get; set; }
     }
 
     public class Preferences
     {
-        private readonly JsonSerializerOptions _serializeOptions;
-
         // Enums
         public class Enums
         {
-            public enum EquityOrderLegInstruction { BUY, SELL, BUY_TO_COVER, SELL_SHORT, NONE };
+            public enum EquityOrderLegInstruction : byte { BUY, SELL, BUY_TO_COVER, SELL_SHORT, NONE };
 
-            public enum EquityOrderType { MARKET, LIMIT, STOP, STOP_LIMIT, TRAILING_STOP, MARKET_ON_CLOSE, NONE }
+            public enum EquityOrderType : byte { MARKET, LIMIT, STOP, STOP_LIMIT, TRAILING_STOP, MARKET_ON_CLOSE, NONE }
 
-            public enum EquityOrderPriceLinkType { VALUE, PERCENT, NONE }
+            public enum EquityOrderPriceLinkType : byte { VALUE, PERCENT, NONE }
 
-            public enum EquityOrderDuration { DAY, GOOD_TILL_CANCEL, NONE }
+            public enum EquityOrderDuration : byte { DAY, GOOD_TILL_CANCEL, NONE }
 
-            public enum EquityOrderMarketSession { AM, PM, NORMAL, SEAMLESS, NONE }
+            public enum EquityOrderMarketSession : byte { AM, PM, NORMAL, SEAMLESS, NONE }
 
-            public enum TaxLotMethod { FIFO, LIFO, HIGH_COST, LOW_COST, MINIMUM_TAX, AVERAGE_COST, NONE }
+            public enum TaxLotMethod : byte { FIFO, LIFO, HIGH_COST, LOW_COST, MINIMUM_TAX, AVERAGE_COST, NONE }
 
-            public enum AdvancedToolLaunch { TA, N, Y, TOS, NONE, CC2 }
+            public enum AdvancedToolLaunch : byte { TA, N, Y, TOS, NONE, CC2 }
 
-            public enum AuthTokenTimeout { FIFTY_FIVE_MINUTES, TWO_HOURS, FOUR_HOURS, EIGHT_HOURS }
+            public enum AuthTokenTimeout : byte { FIFTY_FIVE_MINUTES, TWO_HOURS, FOUR_HOURS, EIGHT_HOURS }
         }
 
         // Properties
-        public bool ExpressTrading { get; set; }
+        public bool? ExpressTrading { get; set; }
         public bool? DirectOptionsRouting { get; set; }
         public bool? DirectEquityRouting { get; set; }
-        public Enums.EquityOrderLegInstruction DefaultEquityOrderLegInstruction { get; set; }
-        public Enums.EquityOrderType DefaultEquityOrderType { get; set; }
-        public Enums.EquityOrderPriceLinkType DefaultEquityOrderPriceLinkType { get; set; }
-        public Enums.EquityOrderDuration DefaultEquityOrderDuration { get; set; }
-        public Enums.EquityOrderMarketSession DefaultEquityOrderMarketSession { get; set; }
-        public int DefaultEquityQuantity { get; set; }
-        public Enums.TaxLotMethod MutualFundTaxLotMethod { get; set; }
-        public Enums.TaxLotMethod OptionTaxLotMethod { get; set; }
-        public Enums.TaxLotMethod EquityTaxLotMethod { get; set; }
-        public Enums.AdvancedToolLaunch DefaultAdvancedToolLaunch { get; set; }
-        public Enums.AuthTokenTimeout AuthTokenTimeout { get; set; }
+        public Enums.EquityOrderLegInstruction? DefaultEquityOrderLegInstruction { get; set; }
+        public Enums.EquityOrderType? DefaultEquityOrderType { get; set; }
+        public Enums.EquityOrderPriceLinkType? DefaultEquityOrderPriceLinkType { get; set; }
+        public Enums.EquityOrderDuration? DefaultEquityOrderDuration { get; set; }
+        public Enums.EquityOrderMarketSession? DefaultEquityOrderMarketSession { get; set; }
+        public int? DefaultEquityQuantity { get; set; }
+        public Enums.TaxLotMethod? MutualFundTaxLotMethod { get; set; }
+        public Enums.TaxLotMethod? OptionTaxLotMethod { get; set; }
+        public Enums.TaxLotMethod? EquityTaxLotMethod { get; set; }
+        public Enums.AdvancedToolLaunch? DefaultAdvancedToolLaunch { get; set; }
+        public Enums.AuthTokenTimeout? AuthTokenTimeout { get; set; }
 
-        public Preferences()
+        public string ToJson()
         {
-            _serializeOptions = new JsonSerializerOptions()
+            JsonSerializerOptions _serializerOptions = new()
             {
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
                 WriteIndented = true,
@@ -85,11 +83,7 @@ namespace TDAmeritradeAPI
                     new JsonStringEnumConverter()
                 }
             };
-        }
-
-        public string ToJson()
-        {
-            return JsonSerializer.Serialize(this, _serializeOptions);
+            return JsonSerializer.Serialize(this, _serializerOptions);
         }
     }
 
@@ -105,7 +99,7 @@ namespace TDAmeritradeAPI
         // Structs
         public class Structs
         {
-            public struct Keys
+            public struct StreamerSubscriptionKey
             {
                 public string? Key { get; set; }
             }
@@ -114,8 +108,6 @@ namespace TDAmeritradeAPI
                 public string? StreamerBinaryUrl { get; set; }
                 public string? StreamerSocketUrl { get; set; }
                 public string? Token { get; set; }
-
-                // ISO 8601 formatted DateTime object
                 public string? TokenTimestamp { get; set; }
                 public string? UserGroup { get; set; }
                 public string? AccessLevel { get; set; }
@@ -124,7 +116,7 @@ namespace TDAmeritradeAPI
             }
             public struct SubscriptionKeys
             {
-                public Keys[] Keys { get; set; }
+                public StreamerSubscriptionKey[] Keys { get; set; }
             }
         }
         public string? AuthToken { get; set; }
@@ -135,11 +127,11 @@ namespace TDAmeritradeAPI
         public string? TokenExpirationTime { get; set; }
         public string? LoginTime { get; set; }
         public string? AccessLevel { get; set; }
-        public bool StalePassword { get; set; }
+        public bool? StalePassword { get; set; }
         public Structs.StreamerInfo? StreamerInfo { get; set; }
         public Enums.ProfessionalStatusTypes? ProfessionalStatus { get; set; }
         public Dictionary<string, bool>? Quotes { get; set; }
         public Structs.SubscriptionKeys? StreamerSubscriptionKeys { get; set; }
-        public List<Account>? Accounts { get; set; }
+        public Account[]? Accounts { get; set; }
     }
 }

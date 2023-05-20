@@ -44,7 +44,7 @@ namespace TDAmeritradeAPI
                 // Deserialize the string into the appropriate datatype
                 _oAuth2Data = JsonSerializer.Deserialize<OAuth2Data>(oAuth2DataString)!;
             }
-            catch (FileNotFoundException)
+            catch (Exception ex) when (ex is JsonException || ex is FileNotFoundException)
             {
                 Console.WriteLine($"Error. The attempt to read the authorization file failed.\n\n");
                 _oAuth2Data = new OAuth2Data();
@@ -985,7 +985,6 @@ namespace TDAmeritradeAPI
          * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
         #endregion
 
-        // Check
         #region Accounts
 
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -1109,7 +1108,6 @@ namespace TDAmeritradeAPI
          * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
         #endregion
 
-        // Check
         #region User Info & Preferences
         /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
          *                                     User Info & Preferences                                   *
@@ -1119,9 +1117,7 @@ namespace TDAmeritradeAPI
         /// Preferences for a specific account.
         /// </summary>
         /// <param name="accountId">The account's ID.</param>
-        /// <returns>A JSON formatted string containing the Preferences for the accounts.</returns>
-        /// <remarks>It is possible to deserialize the JSON using JsonConvert into a Preferences struct.
-        /// However, make sure to use the appropriate ContractResolver to parse the camel case.</remarks>
+        /// <returns>A Preferences class with the preferences for the accounts.</returns>
         public async Task<Preferences?> GetPreferences(string accountId)
         {
             string endpoint = $"https://api.tdameritrade.com/v1/accounts/{accountId}/preferences";
@@ -1135,10 +1131,8 @@ namespace TDAmeritradeAPI
         /// SubscriptionKey for provided accounts or default accounts.
         /// </summary>
         /// <param name="accountIds">The comma-separated Ids.</param>
-        /// <returns>A JSON formatted string containing the SubscriptionKeys for the accounts.</returns>
-        /// <remarks>It is possible to deserialize the JSON using JsonConvert into a UserPrincipal.SubscriptionKeys
-        /// struct. However, make sure to use the appropriate ContractResolver to parse the camel case.</remarks>
-        public async Task<string> GetStreamerSubscriptionKeys(string accountIds)
+        /// <returns>A UserPrincipal.Structs.SubscriptionKeys struct containing the SubscriptionKeys for the accounts.</returns>
+        public async Task<UserPrincipal.Structs.SubscriptionKeys> GetStreamerSubscriptionKeys(string accountIds)
         {
             string endpoint = "https://api.tdameritrade.com/v1/userprincipals/streamersubscriptionkeys";
 
@@ -1147,37 +1141,37 @@ namespace TDAmeritradeAPI
                 { "accountIds", accountIds }
             };
 
-            return await HttpRequest(endpoint, HttpMethod.Get, parameters).ConfigureAwait(false);
+            string response = await HttpRequest(endpoint, HttpMethod.Get, parameters).ConfigureAwait(false);
+
+            return JsonSerializer.Deserialize<UserPrincipal.Structs.SubscriptionKeys>(response, _serializerOptions)!;
         }
 
         /// <summary>
         /// User Principal details.
         /// </summary>
         /// <param name="additionalFields">Additional fields to be returned in the request's response.</param>
-        /// <returns>A JSON formatted string containing the user principal details.</returns>
-        /// <remarks>It is possible to deserialize the JSON using JsonConvert into a UserPrincipal struct.
-        /// However, make sure to use the appropriate ContractResolver to parse the camel case.</remarks>
-        public async Task<string> GetUserPrincipals(List<UserPrincipal.Enums.AdditionalField> additionalFields)
+        /// <returns>A UserPrincipal instance containing the user principal details.</returns>
+        public async Task<UserPrincipal> GetUserPrincipals(UserPrincipal.Enums.AdditionalField[]? additionalFields = null)
         {
             string endpoint = $"https://api.tdameritrade.com/v1/userprincipals";
 
+            Dictionary<string, string>? parameters = null;
             // Remove repeated fields
-            additionalFields = additionalFields.Distinct().ToList();
-
-            string fields = "";
-            // Create a comma-separated list of Additional Fields in camel case formatting
-            foreach (UserPrincipal.Enums.AdditionalField additionalField in additionalFields)
+            if (additionalFields != null)
             {
-                string currentField = additionalField.ToString();
-                fields += char.ToLowerInvariant(currentField[0]) + currentField[1..] + ',';
+                additionalFields = additionalFields.Distinct().ToArray();
+                char[] fields = string.Join(',', additionalFields).ToCharArray();
+                fields[0] = char.ToLower(fields[0]);
+                for (int i = 1; i < fields.Length; i++)
+                    if (fields[i - 1] == ',') fields[i] = char.ToLower(fields[i]);
+                parameters = new()
+                {
+                    { "fields", new string(fields) }
+                };
             }
 
-            Dictionary<string, string> parameters = new()
-            {
-                { "fields", fields }
-            };
-
-            return await HttpRequest(endpoint, HttpMethod.Get, parameters).ConfigureAwait(false);
+            string response = await HttpRequest(endpoint, HttpMethod.Get, parameters).ConfigureAwait(false);
+            return JsonSerializer.Deserialize<UserPrincipal>(response, _serializerOptions)!;
         }
 
         /// <summary>

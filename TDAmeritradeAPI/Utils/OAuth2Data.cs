@@ -1,6 +1,6 @@
 ﻿using System.Text.Json;
 
-namespace TDAmeritradeAPI
+namespace TDAmeritradeAPI.Utils
 {
     public class OAuth2Data
     {
@@ -41,7 +41,7 @@ namespace TDAmeritradeAPI
             if (AccessTokenExpiration < 0)
                 code = 1;
             // Check if the access token expires within 3 minutes (in seconds) or already expired
-            else if ((secondsSinceEpoch + 180) >= AccessTokenExpiration)
+            else if (secondsSinceEpoch + 180 >= AccessTokenExpiration)
                 code = 1;
 
             // Check if the refresh token expiration has been initialized at all
@@ -51,7 +51,7 @@ namespace TDAmeritradeAPI
             else if (secondsSinceEpoch >= RefreshTokenExpiration)
                 return 4;
             // Check if the refresh token is within 24 hours (in seconds) to expire or already expired
-            else if ((secondsSinceEpoch + 86400) >= RefreshTokenExpiration)
+            else if (secondsSinceEpoch + 86400 >= RefreshTokenExpiration)
                 code |= 2;
 
             return code;
@@ -82,8 +82,8 @@ namespace TDAmeritradeAPI
             if (token == TokenType.Both)
                 return -1;
             else
-                return (token == TokenType.AccessToken ? ((int)AccessTokenExpiration! - secondsSinceEpoch)
-                : ((int)RefreshTokenExpiration! - secondsSinceEpoch));
+                return token == TokenType.AccessToken ? (int)AccessTokenExpiration! - secondsSinceEpoch
+                : (int)RefreshTokenExpiration! - secondsSinceEpoch;
         }
 
         public string AsJson()

@@ -1,4 +1,6 @@
-﻿namespace TDAmeritradeAPI
+﻿using TDAmeritradeAPI.DataModels;
+
+namespace TDAmeritradeAPI.Utils
 {
     public class OrderGenerator
     {
@@ -86,10 +88,10 @@
                 if (!_validEquityInstruction.Contains(instruction))
                     throw new ArgumentException($"Error. The only valid instructions for equities are {string.Join(',', _validEquityInstruction)}.",
                         nameof(instruction));
-            else if (securityType == Order.Enums.SecurityType.Option)
-                if (!_validOptionInstruction.Contains(instruction))
-                    throw new ArgumentException($"Error. The only valid instructions for options are {string.Join(',', _validOptionInstruction)}.",
-                        nameof(instruction));
+                else if (securityType == Order.Enums.SecurityType.Option)
+                    if (!_validOptionInstruction.Contains(instruction))
+                        throw new ArgumentException($"Error. The only valid instructions for options are {string.Join(',', _validOptionInstruction)}.",
+                            nameof(instruction));
         }
 
         /// <summary>
@@ -131,11 +133,11 @@
                 if (longOption.StrikePrice == shortOption.StrikePrice || longOption.Expiration.Date != shortOption.Expiration.Date)
                     throw new ArgumentException("Error. Invalid vertical spread." +
                         " The strike prices must be different and the expiration dates must match.");
-            else if (spreadType == SpreadType.Horizontal)
-                // Horizontal spreads must have same strike prices and different expiration date
-                if (longOption.StrikePrice != shortOption.StrikePrice || longOption.Expiration.Date == shortOption.Expiration.Date)
-                    throw new ArgumentException("Error. Invalid vertical spread." +
-                        " The strike prices must match and the expiration dates must be different.");
+                else if (spreadType == SpreadType.Horizontal)
+                    // Horizontal spreads must have same strike prices and different expiration date
+                    if (longOption.StrikePrice != shortOption.StrikePrice || longOption.Expiration.Date == shortOption.Expiration.Date)
+                        throw new ArgumentException("Error. Invalid vertical spread." +
+                            " The strike prices must match and the expiration dates must be different.");
         }
 
         /// <summary>
@@ -150,7 +152,7 @@
             if (symbolType != expectedType)
                 throw new ArgumentException("Error. The symbol passed is not valid for this type of order.");
         }
-        
+
         /// <summary>
         /// Verifies what kind of security the symbol belongs to (Equity, Option, or Other).
         /// </summary>
@@ -159,7 +161,7 @@
         /// <remarks>This function cannot differentiate between equities and mutual funds.</remarks>
         private static Order.Enums.SecurityType GetSecurityType(string symbol)
         {
-            foreach(char letter in symbol)
+            foreach (char letter in symbol)
             {
                 if (letter == '_') return Order.Enums.SecurityType.Option;
                 else if (letter == '.' || letter == '/' || letter == '$')
@@ -463,7 +465,7 @@
             order.OrderType = Order.Enums.OrderType.STOP_LIMIT;
             order.StopPrice = stopPrice;
             order.StopPriceLinkBasis = stopPriceLinkBasis;
-            order.Price= limitPrice;
+            order.Price = limitPrice;
         }
 
         /// <summary>

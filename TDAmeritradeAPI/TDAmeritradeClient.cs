@@ -11,10 +11,12 @@ using System.Web;
 using Yoh.Text.Json.NamingPolicies;
 using System.Text.Json.Serialization;
 using System.Globalization;
+using TDAmeritradeAPI.DataModels;
+using TDAmeritradeAPI.Utils;
 
 namespace TDAmeritradeAPI
 {
-    public class Client
+    public class TDAmeritradeClient
     {
         private const string authFilePath = "oa2d.json";
         private bool _firstTimer = true;
@@ -23,8 +25,8 @@ namespace TDAmeritradeAPI
         private readonly OAuth2Data _oAuth2Data;
         private readonly JsonSerializerOptions _serializerOptions;
         private enum Token { AccessToken, RefreshToken };
-
-        public Client()
+        public bool IsLoggedIn { get; private set; } = false;
+        public TDAmeritradeClient()
         {
             _serializerOptions = new JsonSerializerOptions()
             {
@@ -69,6 +71,8 @@ namespace TDAmeritradeAPI
 
             // Save the changes to the file
             _oAuth2Data.SaveChanges();
+
+            IsLoggedIn = true;
         }
 
         #region OAuth 2.0
@@ -1132,7 +1136,7 @@ namespace TDAmeritradeAPI
         /// </summary>
         /// <param name="accountIds">The comma-separated Ids.</param>
         /// <returns>A UserPrincipal.Structs.SubscriptionKeys struct containing the SubscriptionKeys for the accounts.</returns>
-        public async Task<UserPrincipal.Structs.SubscriptionKeys> GetStreamerSubscriptionKeys(string accountIds)
+        public async Task<UserPrincipals.Structs.SubscriptionKeys> GetStreamerSubscriptionKeys(string accountIds)
         {
             string endpoint = "https://api.tdameritrade.com/v1/userprincipals/streamersubscriptionkeys";
 
@@ -1143,7 +1147,7 @@ namespace TDAmeritradeAPI
 
             string response = await HttpRequest(endpoint, HttpMethod.Get, parameters).ConfigureAwait(false);
 
-            return JsonSerializer.Deserialize<UserPrincipal.Structs.SubscriptionKeys>(response, _serializerOptions)!;
+            return JsonSerializer.Deserialize<UserPrincipals.Structs.SubscriptionKeys>(response, _serializerOptions)!;
         }
 
         /// <summary>
@@ -1151,7 +1155,7 @@ namespace TDAmeritradeAPI
         /// </summary>
         /// <param name="additionalFields">Additional fields to be returned in the request's response.</param>
         /// <returns>A UserPrincipal instance containing the user principal details.</returns>
-        public async Task<UserPrincipal> GetUserPrincipals(UserPrincipal.Enums.AdditionalField[]? additionalFields = null)
+        public async Task<UserPrincipals> GetUserPrincipals(UserPrincipals.Enums.AdditionalField[]? additionalFields = null)
         {
             string endpoint = $"https://api.tdameritrade.com/v1/userprincipals";
 
@@ -1171,7 +1175,7 @@ namespace TDAmeritradeAPI
             }
 
             string response = await HttpRequest(endpoint, HttpMethod.Get, parameters).ConfigureAwait(false);
-            return JsonSerializer.Deserialize<UserPrincipal>(response, _serializerOptions)!;
+            return JsonSerializer.Deserialize<UserPrincipals>(response, _serializerOptions)!;
         }
 
         /// <summary>

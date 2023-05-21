@@ -1,7 +1,7 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace TDAmeritradeAPI
+namespace TDAmeritradeAPI.DataModels
 {
     public class Order : ICloneable
     {
@@ -64,11 +64,11 @@ namespace TDAmeritradeAPI
         }
 
         // Structs
-            public struct OrderTime
-            {
-                public string? Date { get; set; }
-                public bool? ShortFormat { get; set; }
-            }
+        public struct OrderTime
+        {
+            public string? Date { get; set; }
+            public bool? ShortFormat { get; set; }
+        }
         public class OrderLeg
         {
             public OrderLeg() { }

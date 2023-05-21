@@ -1,7 +1,7 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace TDAmeritradeAPI
+namespace TDAmeritradeAPI.DataModels
 {
     public class Account
     {
@@ -87,7 +87,7 @@ namespace TDAmeritradeAPI
         }
     }
 
-    public class UserPrincipal
+    public class UserPrincipals
     {
         // Enums
         public class Enums

@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace TDAmeritradeAPI
+namespace TDAmeritradeAPI.DataModels
 {
     public class Quote
     {

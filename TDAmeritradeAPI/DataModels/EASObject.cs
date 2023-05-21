@@ -1,4 +1,4 @@
-﻿namespace TDAmeritradeAPI
+﻿namespace TDAmeritradeAPI.DataModels
 {
     public class EASObject
     {

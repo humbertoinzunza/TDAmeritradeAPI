@@ -1,7 +1,8 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
+using TDAmeritradeAPI.DataModels;
 
-namespace TDAmeritradeAPI
+namespace TDAmeritradeAPI.Serializers
 {
     public class OrderInstrumentConverter : JsonConverter<OrderInstrument>
     {
@@ -163,7 +164,7 @@ namespace TDAmeritradeAPI
                     writer.WriteString("maturityDate", fixedIncome.MaturityDate);
                 if (fixedIncome.VariableRate is not null)
                     writer.WriteNumber("variableRate", (double)fixedIncome.VariableRate);
-                if(fixedIncome.Factor is not null)
+                if (fixedIncome.Factor is not null)
                     writer.WriteNumber("factor", (double)fixedIncome.Factor);
             }
             else if (instrument is MutualFund mutualFund)
@@ -205,6 +206,12 @@ namespace TDAmeritradeAPI
             }
             writer.WriteEndObject();
         }
+    }
+
+    public class LowerCaseNamingPolicy : JsonNamingPolicy
+    {
+        public override string ConvertName(string name) =>
+            name.ToLower();
     }
 }
 

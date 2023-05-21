@@ -1,6 +1,6 @@
 ﻿using System.Text.Json;
 
-namespace TDAmeritradeAPI
+namespace TDAmeritradeAPI.DataModels
 {
     public class Watchlist
     {

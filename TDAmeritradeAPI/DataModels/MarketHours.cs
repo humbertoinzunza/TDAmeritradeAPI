@@ -1,4 +1,4 @@
-﻿namespace TDAmeritradeAPI
+﻿namespace TDAmeritradeAPI.DataModels
 {
     public enum MarketType { EQUITY, OPTION, FUTURE, BOND, FOREX }
     public struct Hours

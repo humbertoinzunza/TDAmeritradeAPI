@@ -5,10 +5,10 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace TDAmeritradeAPI
+namespace TDAmeritradeAPI.DataModels
 {
 
-   public class OptionChain
+    public class OptionChain
     {
         public class Enums
         {

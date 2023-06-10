@@ -2,9 +2,11 @@
 using System.Net.WebSockets;
 using System.Text;
 using TDAmeritradeAPI.DataModels;
-using TDAmeritradeAPI.Utils;
 using TDAmeritradeAPI.Serializers;
 using System.Text.Json.Serialization;
+using System.Web;
+using static TDAmeritradeAPI.TDAmeritradeStreamingClient.Enums;
+using System.Text.Json.Nodes;
 
 namespace TDAmeritradeAPI
 {
@@ -13,8 +15,22 @@ namespace TDAmeritradeAPI
         private readonly ClientWebSocket _webSocket;
         private readonly TDAmeritradeClient _client;
         private UserPrincipals? _principal;
-        private JsonSerializerOptions _serializerOptions;
+        private readonly JsonSerializerOptions _serializerOptions;
 
+        public class Enums
+        {
+            public enum QosLevel : byte { EXPRESS = 0, REAL_TIME = 1, FAST = 2, MODERATE = 3, SLOW = 4, DELAYED = 5 }
+            internal enum Service : byte
+            {
+                ACCT_ACTIVITY, ADMIN, ACTIVES_NASDAQ, ACTIVES_NYSE, ACTIVES_OTCBB, ACTIVES_OPTIONS,
+                FOREX_BOOK, FUTURES_BOOK, LISTED_BOOK, NASDAQ_BOOK, OPTIONS_BOOK, FUTURES_OPTIONS_BOOK,
+                CHART_EQUITY, CHART_FUTURES, CHART_HISTORY_FUTURES, QUOTE, LEVELONE_FUTURES, LEVELONE_FOREX,
+                LEVELONE_FUTURES_OPTIONS, OPTION, LEVELTWO_FUTURES, NEWS_HEADLINE, NEWS_STORY, NEWS_HEADLINE_LIST,
+                STREAMER_SERVER, TIMESALE_EQUITY, TIMESALE_FUTURES, TIMESALE_FOREX, TIMESALE_OPTIONS
+            }
+        }
+
+        public bool IsConnected { get; private set; }   
         public TDAmeritradeStreamingClient(TDAmeritradeClient client)
         {
             if (client == null) throw new ArgumentNullException(nameof(client));
@@ -41,64 +57,80 @@ namespace TDAmeritradeAPI
             await _webSocket.ConnectAsync(new Uri(uri), CancellationToken.None);
         }
 
+        #region ADMIN Service
         public async Task Login()
         {
             // Parse the timestamp to UNIX time
             DateTime dateTime = DateTime.Parse(_principal!.StreamerInfo!.Value.TokenTimestamp!);
             double unixTimestamp = dateTime.ToUniversalTime().Subtract(new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds;
-            // Build the credentials struct
-            AdminRequest.Structs.Credential credential = new()
+            // Build the credentials dictionary
+            Dictionary<string, string> credential = new()
             {
-                UserId = _principal.Accounts![0].AccountID!,
-                Token = _principal.StreamerInfo!.Value.Token!,
-                Company = _principal.Accounts![0].Company!,
-                Segment = _principal.Accounts![0].Segment!,
-                CdDomain = _principal.Accounts![0].AccountCdDomainId!,
-                UserGroup = _principal.StreamerInfo.Value.UserGroup!,
-                AccessLevel = _principal.StreamerInfo.Value.AccessLevel!,
-                Authorized = 'Y',
-                Timestamp = unixTimestamp,
-                AppId = _principal.StreamerInfo.Value.AppId!,
-                Acl = _principal.StreamerInfo.Value.Acl!
+                { "userid", _principal.Accounts![0].AccountID! },
+                { "token", _principal.StreamerInfo!.Value.Token! },
+                { "company", _principal.Accounts![0].Company! },
+                { "segment", _principal.Accounts![0].Segment! },
+                { "cddomain", _principal.Accounts![0].AccountCdDomainId! },
+                { "usergroup", _principal.StreamerInfo.Value.UserGroup! },
+                { "accesslevel", _principal.StreamerInfo.Value.AccessLevel! },
+                { "authorized", "Y" },
+                { "timestamp", unixTimestamp.ToString() },
+                { "appid", _principal.StreamerInfo.Value.AppId! },
+                { "acl", _principal.StreamerInfo.Value.Acl! }
             };
-            // Build the parameters struct
-            AdminRequest.Structs.Parameters parameters = new()
+            // Build the parameters JSON
+            JsonObject parameters = new()
             {
-                Credential = credential,
-                Token = _principal.StreamerInfo.Value.Token!,
-                Version = "1.0"
+                ["credential"] = DictionaryToQueryString(credential),
+                ["token"] = _principal.StreamerInfo.Value.Token!,
+                ["version"] = "1.0"
             };
-            // Build the AdminRequest and the StreamingRequest objects for the websocket request
-            AdminRequest adminRequest = new(AdminRequest.Enums.Command.LOGIN, 0, _principal.Accounts[0].AccountID!,
-                _principal.StreamerInfo.Value.AppId!, parameters);
-            StreamingRequests streamingRequests = new(new[] { adminRequest });
-            // Get the data to send as a JSON string
-            string jsonString = JsonSerializer.Serialize(streamingRequests, _serializerOptions);
-            await SendToServer(jsonString);
+            await SendToServer(Service.ADMIN, 0, "LOGIN", parameters).ConfigureAwait(false);
         }
 
         public async Task LogOut()
         {
-            // Build the AdminRequest and the StreamingRequest objects for the websocket request
-            AdminRequest adminRequest = new(AdminRequest.Enums.Command.LOGOUT, 1, _principal!.Accounts![0].AccountID!,
-                _principal.StreamerInfo!.Value.AppId!, new AdminRequest.Structs.Parameters());
-            StreamingRequests streamingRequests = new(new[] { adminRequest });
-            // Get the data to send as a JSON string
-            string jsonString = JsonSerializer.Serialize(streamingRequests, _serializerOptions);
-            await SendToServer(jsonString);
+            await SendToServer(Service.ADMIN, 1, "LOGOUT", new JsonObject()).ConfigureAwait(false);
+            IsConnected = false;
         }
 
-        private async Task SendToServer(string jsonString)
+        public async Task SetQualityOfService(QosLevel qosLevel)
         {
+            await SendToServer(Service.ADMIN, 2, "QOS", new JsonObject{ ["qoslevel"] = ((int)qosLevel).ToString() }).ConfigureAwait(false);
+        }
+        #endregion
+
+        private static string DictionaryToQueryString(Dictionary<string, string> dictionary)
+        {
+            string result = "";
+            foreach (KeyValuePair<string, string> kvp in dictionary)
+                result += kvp.Key + "=" + kvp.Value + '&';
+
+            // Remove the last & symbol
+            result = result[..^1];
+
+            return HttpUtility.UrlEncode(result);
+        }
+
+        private async Task SendToServer(Service service, byte requestId, string command, JsonObject parameters)
+        {
+            JsonObject request = new()
+            {
+                ["service"] = service.ToString(),
+                ["requestid"] = requestId.ToString(),
+                ["command"] = command,
+                ["account"] = _principal!.Accounts![0].AccountID!,
+                ["parameters"] = parameters
+            };
             // Create an buffer of the JSON string in UTF8 encoding
-            ArraySegment<byte> buffer = new(Encoding.UTF8.GetBytes(jsonString));
+            ArraySegment<byte> buffer = new(Encoding.UTF8.GetBytes(request.ToString()));
             // Send the data to the server
             await _webSocket.SendAsync(buffer, WebSocketMessageType.Text, true, CancellationToken.None).ConfigureAwait(false);
         }
 
         public void Dispose()
         {
-
+            _webSocket.Dispose();
         }
     }
 }
